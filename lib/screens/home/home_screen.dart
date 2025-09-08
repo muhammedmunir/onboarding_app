@@ -113,7 +113,7 @@ Widget _buildQuickActions(Color primaryColor) {
         ),
         const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(5),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -132,11 +132,11 @@ Widget _buildQuickActions(Color primaryColor) {
               Expanded(
                 child: Column(
                   children: [
-                    const SizedBox(height: 40), // Spacer untuk kosong atas
+                    const SizedBox(height: 50), // Spacer untuk kosong atas
                     _buildSmallActionCompact(Icons.school, "Learning\nHub", primaryColor),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 20),
                     _buildSmallActionCompact(Icons.apartment, "Facilities\n", primaryColor),
-                    const SizedBox(height: 40), // Spacer untuk kosong bawah
+                    const SizedBox(height: 50), // Spacer untuk kosong bawah
                   ],
                 ),
               ),
@@ -146,9 +146,9 @@ Widget _buildQuickActions(Color primaryColor) {
                 child: Column(
                   children: [
                     _buildSmallActionCompact(Icons.description, "My\nDocument", primaryColor),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 20),
                     _buildCenterJourneyCompact(primaryColor),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 20),
                     _buildSmallActionCompact(Icons.task_alt, "Task\nManager", primaryColor),
                   ],
                 ),
@@ -158,11 +158,11 @@ Widget _buildQuickActions(Color primaryColor) {
               Expanded(
                 child: Column(
                   children: [
-                    const SizedBox(height: 40), // Spacer untuk kosong atas
+                    const SizedBox(height: 50), // Spacer untuk kosong atas
                     _buildSmallActionCompact(Icons.people, "Meet the\nTeam", primaryColor),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 20),
                     _buildSmallActionCompact(Icons.chat_bubble, "Buddy\nChat", primaryColor),
-                    const SizedBox(height: 40), // Spacer untuk kosong bawah
+                    const SizedBox(height: 50), // Spacer untuk kosong bawah
                   ],
                 ),
               ),
@@ -183,8 +183,8 @@ Widget _buildSmallActionCompact(IconData icon, String label, Color color) {
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, size: 40, color: color), // Ukuran icon tetap
-        const SizedBox(height: 6), // Jarak lebih kecil
+        Icon(icon, size: 50, color: color), // Ukuran icon tetap
+        const SizedBox(height: 5), // Jarak lebih kecil
         Text(
           label,
           textAlign: TextAlign.center,
@@ -199,37 +199,61 @@ Widget _buildSmallActionCompact(IconData icon, String label, Color color) {
 Widget _buildCenterJourneyCompact(Color color) {
   return GestureDetector(
     onTap: () {
-      // TODO: My Journey action
+      // Implement My Journey action here if needed
     },
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Circular elevated button (lebih kecil)
         Container(
-          width: 90, // Lebih kecil dari sebelumnya
-          height: 90, // Lebih kecil dari sebelumnya
-          decoration: BoxDecoration(
+          width: 120,
+            height: 120,
+            decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: color,
+            color: const Color.fromRGBO(245, 245, 247, 1),
             boxShadow: [
+              // Subtle grey shadow for border
               BoxShadow(
-                color: color.withOpacity(0.28),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
+              color: Colors.grey.withOpacity(0.12),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+              ),
+              // Slight white glow for highlight
+              BoxShadow(
+              color: Colors.white.withOpacity(0.18),
+              blurRadius: 16,
+              offset: const Offset(0, 0),
+              spreadRadius: 2,
               ),
             ],
           ),
-          child: const Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.flag, size: 50, color: Colors.white), // Ukuran icon tetap
-                Text(
-                  "My\nJourney",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: Colors.white), // Font lebih kecil
-                )
-              ],
+          child: Center(
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color,
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.28),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.flag, size: 60, color: Colors.white), // Ukuran icon tetap
+                    Text(
+                      "My\nJourney",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 10, color: Colors.white), // Font lebih kecil
+                    )
+                  ],
+                ),
+              ),
             ),
           ),
         ),
