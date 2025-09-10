@@ -29,7 +29,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     'Intern'
   ];
 
+  // Add form key
+  final _formKey = GlobalKey<FormState>();
+
   void _register() async {
+    // Validate form
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -58,7 +66,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Background hexagon
+          // Fixed Background hexagon
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
@@ -68,7 +76,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
 
-          // Semi circle atas
+          // Fixed Semi circle atas
           Align(
             alignment: Alignment.topCenter,
             child: Container(
@@ -83,7 +91,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
 
-          // Semi circle bawah
+          // Fixed Semi circle bawah
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
@@ -98,258 +106,303 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
 
-          // Content
+          // Fixed Logo OnboardingX
+          Positioned(
+            top: 40,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Image.asset(
+                "assets/images/logo_OnboardingX.png",
+                width: 200,
+              ),
+            ),
+          ),
+
+          // Scrollable content
           SafeArea(
-            child: Stack(
-              children: [
-                SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 20),
-                      
-                      // Back Button
-                    //   Align(
-                    //     alignment: Alignment.topLeft,
-                    //     child: IconButton(
-                    //       icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    //       onPressed: () => Navigator.of(context).pop(),
-                    //     ),
-                    //   ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Form(
+                key: _formKey, // Add form key here
+                child: Column(
+                  children: [
+                    const SizedBox(height: 180),
 
-                    //   const SizedBox(height: 10),
-
-                      // Logo OnboardingX (atas)
-                      Center(
-                        child: Image.asset(
-                          "assets/images/logo_OnboardingX.png",
-                          width: 200,
-                        ),
+                    // Register Card
+                    Container(
+                      padding: const EdgeInsets.all(24.0),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
                       ),
-
-                      const SizedBox(height: 40),
-
-                      // Kad Register
-                      Container(
-                        padding: const EdgeInsets.all(24.0),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 5),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            "Sign Up",
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
                             ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const Text(
-                              "Sign Up",
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 20),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 20),
 
-                            // Name
-                            TextField(
-                              controller: _nameController,
-                              decoration: const InputDecoration(
-                                labelText: "Full Name",
-                                border: UnderlineInputBorder(),
-                                prefixIcon: Icon(Icons.person),
-                              ),
+                          // Name
+                          TextFormField(
+                            controller: _nameController,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your full name';
+                              }
+                              return null;
+                            },
+                            decoration: const InputDecoration(
+                              labelText: "Full Name",
+                              border: UnderlineInputBorder(),
+                              prefixIcon: Icon(Icons.person),
                             ),
-                            const SizedBox(height: 15),
+                          ),
+                          const SizedBox(height: 15),
 
-                            // Email
-                            TextField(
-                              controller: _emailController,
-                              decoration: const InputDecoration(
-                                labelText: "Email",
-                                border: UnderlineInputBorder(),
-                                prefixIcon: Icon(Icons.email),
-                              ),
-                              keyboardType: TextInputType.emailAddress,
+                          // Email
+                          TextFormField(
+                            controller: _emailController,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your email';
+                              }
+                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                return 'Please enter a valid email';
+                              }
+                              return null;
+                            },
+                            decoration: const InputDecoration(
+                              labelText: "Email",
+                              border: UnderlineInputBorder(),
+                              prefixIcon: Icon(Icons.email),
                             ),
-                            const SizedBox(height: 15),
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 15),
 
-                            // Phone Number
-                            TextField(
-                              controller: _phoneController,
-                              decoration: const InputDecoration(
-                                labelText: "Phone Number",
-                                border: UnderlineInputBorder(),
-                                prefixIcon: Icon(Icons.phone),
-                              ),
-                              keyboardType: TextInputType.phone,
+                          // Phone Number
+                          TextFormField(
+                            controller: _phoneController,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your phone number';
+                              }
+                              if (!RegExp(r'^[0-9]{10,}$').hasMatch(value)) {
+                                return 'Please enter a valid phone number';
+                              }
+                              return null;
+                            },
+                            decoration: const InputDecoration(
+                              labelText: "Phone Number",
+                              border: UnderlineInputBorder(),
+                              prefixIcon: Icon(Icons.phone),
                             ),
-                            const SizedBox(height: 15),
+                            keyboardType: TextInputType.phone,
+                          ),
+                          const SizedBox(height: 15),
 
-                            // Work Unit
-                            TextField(
-                              controller: _workUnitController,
-                              decoration: const InputDecoration(
-                                labelText: "Work Unit",
-                                border: UnderlineInputBorder(),
-                                prefixIcon: Icon(Icons.business),
-                              ),
+                          // Work Unit
+                          TextFormField(
+                            controller: _workUnitController,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your work unit';
+                              }
+                              return null;
+                            },
+                            decoration: const InputDecoration(
+                              labelText: "Work Unit",
+                              border: UnderlineInputBorder(),
+                              prefixIcon: Icon(Icons.business),
                             ),
-                            const SizedBox(height: 15),
+                          ),
+                          const SizedBox(height: 15),
 
-                            // Workplace
-                            TextField(
-                              controller: _workplaceController,
-                              decoration: const InputDecoration(
-                                labelText: "Workplace",
-                                border: UnderlineInputBorder(),
-                                prefixIcon: Icon(Icons.work),
-                              ),
+                          // Workplace
+                          TextFormField(
+                            controller: _workplaceController,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your workplace';
+                              }
+                              return null;
+                            },
+                            decoration: const InputDecoration(
+                              labelText: "Workplace",
+                              border: UnderlineInputBorder(),
+                              prefixIcon: Icon(Icons.work),
                             ),
-                            const SizedBox(height: 15),
+                          ),
+                          const SizedBox(height: 15),
 
-                            // Work Type Dropdown
-                            InputDecorator(
-                              decoration: const InputDecoration(
-                                labelText: "Work Type",
-                                border: UnderlineInputBorder(),
-                                prefixIcon: Icon(Icons.category),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: _selectedWorkType,
-                                  isDense: true,
-                                  isExpanded: true,
-                                  hint: const Text("Select work type"),
-                                  items: _workTypes.map((String value) {
-                                    return DropdownMenuItem<String>(
-                                      value: value,
-                                      child: Text(value),
-                                    );
-                                  }).toList(),
-                                  onChanged: (String? newValue) {
-                                    setState(() {
-                                      _selectedWorkType = newValue;
-                                    });
-                                  },
+                          // Work Type Dropdown
+                            DropdownButtonFormField<String>(
+                            value: _selectedWorkType,
+                            decoration: const InputDecoration(
+                              labelText: "Work Type",
+                              border: UnderlineInputBorder(),
+                              prefixIcon: Icon(Icons.category),
+                            ),
+                            isExpanded: true,
+                            hint: const Text("Select work type"),
+                            items: _workTypes.map((String value) {
+                              return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value),
+                              );
+                            }).toList(),
+                            onChanged: (String? newValue) {
+                              setState(() {
+                              _selectedWorkType = newValue;
+                              });
+                            },
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                              return 'Please select a work type';
+                              }
+                              return null;
+                            },
+                            ),
+                          const SizedBox(height: 15),
+
+                          // Password
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter a password';
+                              }
+                              if (value.length < 6) {
+                                return 'Password must be at least 6 characters';
+                              }
+                              return null;
+                            },
+                            decoration: InputDecoration(
+                              labelText: "Password",
+                              border: const UnderlineInputBorder(),
+                              prefixIcon: const Icon(Icons.lock),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
                                 ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
                               ),
                             ),
-                            const SizedBox(height: 15),
+                          ),
+                          const SizedBox(height: 15),
 
-                            // Password
-                            TextField(
-                              controller: _passwordController,
-                              obscureText: _obscurePassword,
-                              decoration: InputDecoration(
-                                labelText: "Password",
-                                border: const UnderlineInputBorder(),
-                                prefixIcon: const Icon(Icons.lock),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons.visibility
-                                        : Icons.visibility_off,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _obscurePassword = !_obscurePassword;
-                                    });
-                                  },
+                          // Confirm Password
+                          TextFormField(
+                            controller: _confirmPasswordController,
+                            obscureText: _obscureConfirmPassword,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please confirm your password';
+                              }
+                              if (value != _passwordController.text) {
+                                return 'Passwords do not match';
+                              }
+                              return null;
+                            },
+                            decoration: InputDecoration(
+                              labelText: "Confirm Password",
+                              border: const UnderlineInputBorder(),
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureConfirmPassword
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
                                 ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscureConfirmPassword = !_obscureConfirmPassword;
+                                  });
+                                },
                               ),
                             ),
-                            const SizedBox(height: 15),
+                          ),
+                          const SizedBox(height: 30),
 
-                            // Confirm Password
-                            TextField(
-                              controller: _confirmPasswordController,
-                              obscureText: _obscureConfirmPassword,
-                              decoration: InputDecoration(
-                                labelText: "Confirm Password",
-                                border: const UnderlineInputBorder(),
-                                prefixIcon: const Icon(Icons.lock_outline),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscureConfirmPassword
-                                        ? Icons.visibility
-                                        : Icons.visibility_off,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _obscureConfirmPassword = !_obscureConfirmPassword;
-                                    });
-                                  },
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 30),
-
-                            // Button Register
-                            _isLoading
-                                ? const Center(child: CircularProgressIndicator())
-                                : ElevatedButton(
-                                    onPressed: _register,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color.fromRGBO(224, 124, 124, 1),
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(30),
-                                      ),
+                          // Button Register
+                          _isLoading
+                              ? const Center(child: CircularProgressIndicator())
+                              : ElevatedButton(
+                                  onPressed: _register,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromRGBO(224, 124, 124, 1),
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(30),
                                     ),
-                                    child: const Text(
-                                      "Register",
-                                      style: TextStyle(
-                                          fontSize: 18, color: Colors.white),
-                                    ),
                                   ),
-                            const SizedBox(height: 20),
-
-                            // Login link
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Text(
-                                  "Already have an account? ",
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const LoginScreen(),
-                                      ),
-                                    );
-                                  },
                                   child: const Text(
-                                    "Login Now",
+                                    "Register",
                                     style: TextStyle(
-                                      color: Color.fromRGBO(224, 124, 124, 1),
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                        fontSize: 18, color: Colors.white),
                                   ),
                                 ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
+                          const SizedBox(height: 20),
 
-                      // Add more space at the bottom to prevent overlapping with the logo
-                      const SizedBox(height: 120),
-                    ],
-                  ),
+                          // Login link
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                "Already have an account? ",
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const LoginScreen(),
+                                    ),
+                                  );
+                                },
+                                child: const Text(
+                                  "Login Now",
+                                  style: TextStyle(
+                                    color: Color.fromRGBO(224, 124, 124, 1),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 40),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ],
