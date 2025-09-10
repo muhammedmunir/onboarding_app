@@ -1,31 +1,29 @@
 import 'package:flutter/material.dart';
-import 'package:onboarding_app/screens/home/home_screen.dart';
-import 'package:onboarding_app/screens/auth/forget_password_screen.dart';
-import 'package:onboarding_app/screens/auth/register_screen.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class ForgotPasswordScreen extends StatefulWidget {
+  const ForgotPasswordScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _obscurePassword = true;
 
-  void _login() async {
+  void _resetPassword() async {
     setState(() {
       _isLoading = true;
     });
 
     await Future.delayed(const Duration(seconds: 2));
 
-    // ignore: use_build_context_synchronously
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
+    // Simulate successful password reset
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Password reset instructions sent to your email'),
+        backgroundColor: Colors.green,
+      ),
     );
 
     setState(() {
@@ -88,7 +86,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: Column(
                     children: [
-                      const SizedBox(height: 30),
+                      // const SizedBox(height: 30),
+
+                      // Back Button
+                      // Align(
+                      //   alignment: Alignment.topLeft,
+                      //   child: IconButton(
+                      //     icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      //     onPressed: () => Navigator.of(context).pop(),
+                      //   ),
+                      // ),
+
+                      const SizedBox(height: 20),
 
                       // Logo OnboardingX (atas)
                       Center(
@@ -98,9 +107,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 120),
+                      const SizedBox(height: 100),
 
-                      // Kad Login
+                      // Forgot Password Card
                       Container(
                         padding: const EdgeInsets.all(24.0),
                         decoration: BoxDecoration(
@@ -118,10 +127,20 @@ class _LoginScreenState extends State<LoginScreen> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             const Text(
-                              "Sign In",
+                              "Reset Password",
                               style: TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 10),
+                            
+                            const Text(
+                              "Enter your email address and we'll send you instructions to reset your password.",
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -137,60 +156,13 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               keyboardType: TextInputType.emailAddress,
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 30),
 
-                            // Password
-                            TextField(
-                              controller: _passwordController,
-                              obscureText: _obscurePassword,
-                              decoration: InputDecoration(
-                                labelText: "Password",
-                                border: const UnderlineInputBorder(),
-                                prefixIcon: const Icon(Icons.lock),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons.visibility
-                                        : Icons.visibility_off,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _obscurePassword = !_obscurePassword;
-                                    });
-                                  },
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-
-                            // Forget Password
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const ForgotPasswordScreen(),
-                                    ),
-                                  );
-                                },
-                                child: const Text(
-                                  "Forget Password?",
-                                  style: TextStyle(
-                                    color: Color.fromRGBO(224, 124, 124, 1),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-
-                            // Button Login
+                            // Reset Password Button
                             _isLoading
                                 ? const Center(child: CircularProgressIndicator())
                                 : ElevatedButton(
-                                    onPressed: _login,
+                                    onPressed: _resetPassword,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color.fromRGBO(224, 124, 124, 1),
                                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -199,48 +171,29 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                     ),
                                     child: const Text(
-                                      "Login",
+                                      "Send Reset Instructions",
                                       style: TextStyle(
                                           fontSize: 18, color: Colors.white),
                                     ),
                                   ),
                             const SizedBox(height: 20),
-
-                            // Register link
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Text(
-                                  "Don't have an account? ",
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                  ),
+                            
+                            // Back to Login
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: const Text(
+                                "Back to Login",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Color.fromRGBO(224, 124, 124, 1),
                                 ),
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const RegisterScreen(),
-                                      ),
-                                    );
-                                  },
-                                  child: const Text(
-                                    "Register Now",
-                                    style: TextStyle(
-                                      color: Color.fromRGBO(224, 124, 124, 1),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                           ],
                         ),
                       ),
 
-                      const SizedBox(height: 100),
+                      const SizedBox(height: 120),
                     ],
                   ),
                 ),
@@ -250,14 +203,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   alignment: Alignment.bottomCenter,
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 25),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Image.asset(
-                          "assets/images/logo_tnb.png",
-                          width: 170,
-                        ),
-                      ],
+                    child: Image.asset(
+                      "assets/images/logo_tnb.png",
+                      width: 170,
                     ),
                   ),
                 ),
@@ -268,4 +216,10 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
+
+void main() {
+  runApp(const MaterialApp(
+    home: ForgotPasswordScreen(),
+  ));
 }

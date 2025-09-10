@@ -1,7 +1,7 @@
-// lib/screens/home/home_screen.dart
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
+import 'package:onboarding_app/screens/auth/login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -108,7 +108,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     right: 0,
                     child: IconButton(
                       onPressed: () {
-                        // TODO: logout action
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                          builder: (context) => const LoginScreen(),
+                          ),
+                        );
                       },
                       icon: const Icon(Icons.logout, color: Colors.white, size: 28),
                     ),
@@ -146,8 +151,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       const Spacer(),
                       IconButton(
                         onPressed: () {
-                          // TODO: logout action
-                        },
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                          builder: (context) => const LoginScreen(),
+                          ),
+                        );
+                      },
                         icon: const Icon(Icons.logout, color: Colors.white, size: 28),
                       ),
                     ],
