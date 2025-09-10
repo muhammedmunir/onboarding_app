@@ -2,6 +2,8 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:onboarding_app/screens/auth/login_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,6 +15,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   bool _isHeaderExpanded = false;
+  Map<String, dynamic>? _userData;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserData();
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -24,6 +33,38 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _isHeaderExpanded = !_isHeaderExpanded;
     });
+  }
+
+  Future<void> _fetchUserData() async {
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+            
+        if (userDoc.exists) {
+          setState(() {
+            _userData = userDoc.data() as Map<String, dynamic>;
+          });
+        }
+      }
+    } catch (e) {
+      print("Error fetching user data: $e");
+    }
+  }
+
+  Future<void> _signOut() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    } catch (e) {
+      print("Error signing out: $e");
+    }
   }
 
   @override
@@ -86,15 +127,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Icon(Icons.person, size: 40, color: Colors.grey),
                       ),
                       const SizedBox(height: 20),
-                      _buildDetailRow(Icons.person, "SITI ZUBAIDAH BINTI ABDUL KASSIM"),
+                      _buildDetailRow(Icons.person, _userData?['fullName'] ?? "Loading..."),
                       const SizedBox(height: 12),
-                      _buildDetailRow(Icons.email, "zubaidah@gmail.com"),
+                      _buildDetailRow(Icons.email, _userData?['email'] ?? "Loading..."),
                       const SizedBox(height: 12),
-                      _buildDetailRow(Icons.phone, "+601-1234 5678"),
+                      _buildDetailRow(Icons.phone, _userData?['phoneNumber'] ?? "Loading..."),
                       const SizedBox(height: 12),
-                      _buildDetailRow(Icons.business, "ESONS | UOA Tower"),
+                      _buildDetailRow(Icons.business, 
+                        "${_userData?['workUnit'] ?? "Loading"} | ${_userData?['workplace'] ?? "Loading"}"),
                       const SizedBox(height: 12),
-                      _buildDetailRow(Icons.work, "Intern"),
+                      _buildDetailRow(Icons.work, _userData?['workType'] ?? "Loading..."),
                       const SizedBox(height: 12),
                       const Icon(
                         Icons.keyboard_arrow_up,
@@ -107,21 +149,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     top: 0,
                     right: 0,
                     child: IconButton(
-                      onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                          builder: (context) => const LoginScreen(),
-                          ),
-                        );
-                      },
+                      onPressed: _signOut,
                       icon: const Icon(Icons.logout, color: Colors.white, size: 28),
                     ),
                   ),
                 ],
               )
             : Column(
-                mainAxisSize: MainAxisSize.min, // Menggunakan minimal space
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     children: [
@@ -131,16 +166,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Icon(Icons.person, size: 40, color: Colors.grey),
                       ),
                       const SizedBox(width: 15),
-                      const Column(
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             "Hello,",
                             style: TextStyle(fontSize: 18, color: Colors.white),
                           ),
                           Text(
-                            "Siti Zubaidah",
-                            style: TextStyle(
+                            _userData?['username'] ?? "Loading...",
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
@@ -150,19 +185,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const Spacer(),
                       IconButton(
-                        onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                          builder: (context) => const LoginScreen(),
-                          ),
-                        );
-                      },
+                        onPressed: _signOut,
                         icon: const Icon(Icons.logout, color: Colors.white, size: 28),
                       ),
                     ],
                   ),
-                  // Menghapus SizedBox yang memberikan space tambahan
                   const Icon(
                     Icons.keyboard_arrow_down,
                     color: Colors.white,
@@ -180,14 +207,16 @@ class _HomeScreenState extends State<HomeScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Icon(icon, color: Colors.white, size: 20),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Text(
-          text,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+            ),
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
       ],
     );
   }
@@ -226,11 +255,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: Column(
                     children: [
-                      const SizedBox(height: 50), // Spacer untuk kosong atas
+                      const SizedBox(height: 50),
                       _buildSmallActionCompact(SvgPicture.asset("assets/svgs/Learning Hub.svg"), "Learning\nHub", primaryColor),
                       const SizedBox(height: 20),
                       _buildSmallActionCompact(SvgPicture.asset("assets/svgs/Facilities.svg"), "Facilities\n", primaryColor),
-                      const SizedBox(height: 50), // Spacer untuk kosong bawah
+                      const SizedBox(height: 50),
                     ],
                   ),
                 ),
@@ -252,11 +281,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: Column(
                     children: [
-                      const SizedBox(height: 50), // Spacer untuk kosong atas
+                      const SizedBox(height: 50),
                       _buildSmallActionCompact(SvgPicture.asset("assets/svgs/Meet the Team.svg"), "Meet the\nTeam", primaryColor),
                       const SizedBox(height: 20),
                       _buildSmallActionCompact(SvgPicture.asset("assets/svgs/Buddy Chat.svg"), "Buddy\nChat", primaryColor),
-                      const SizedBox(height: 50), // Spacer untuk kosong bawah
+                      const SizedBox(height: 50),
                     ],
                   ),
                 ),

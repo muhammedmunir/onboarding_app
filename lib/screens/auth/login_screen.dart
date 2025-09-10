@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:onboarding_app/screens/home/home_screen.dart';
 import 'package:onboarding_app/screens/auth/forget_password_screen.dart';
 import 'package:onboarding_app/screens/auth/register_screen.dart';
+import 'package:onboarding_app/services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,7 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   
-  // Add form key
+  final AuthService _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
 
   void _login() async {
@@ -29,16 +31,109 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
 
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // Call AuthService to login with email and password
+      User? user = await _authService.signInWithEmail(
+        _emailController.text,
+        _passwordController.text,
+      );
 
-    // ignore: use_build_context_synchronously
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      if (user != null) {
+        // Check if email is verified
+        if (user.emailVerified) {
+          // Login successful and email verified - navigate to home screen
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+          );
+        } else {
+          // Email not verified - show verification dialog
+          _showVerificationDialog(context, user);
+        }
+      } else {
+        // Login failed
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Login failed. Please check your credentials.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = 'Login failed. Please try again.';
+      
+      if (e.code == 'user-not-found') {
+        errorMessage = 'No user found with this email.';
+      } else if (e.code == 'wrong-password') {
+        errorMessage = 'Incorrect password.';
+      } else if (e.code == 'invalid-email') {
+        errorMessage = 'Invalid email address.';
+      } else if (e.code == 'user-disabled') {
+        errorMessage = 'This account has been disabled.';
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _showVerificationDialog(BuildContext context, User user) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Email Not Verified'),
+          content: const Text(
+              'Please verify your email address before logging in. '
+              'Check your inbox for a verification email.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Resend Verification'),
+              onPressed: () async {
+                try {
+                  await user.sendEmailVerification();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Verification email sent!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  Navigator.of(context).pop();
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: ${e.toString()}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
     );
-
-    setState(() {
-      _isLoading = false;
-    });
   }
 
   @override
@@ -110,7 +205,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 24.0),
                     child: Form(
-                      key: _formKey, // Add form key
+                      key: _formKey,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
