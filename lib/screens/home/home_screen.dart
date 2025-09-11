@@ -4,6 +4,7 @@ import 'package:flutter_svg/svg.dart';
 import 'package:onboarding_app/screens/auth/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:onboarding_app/screens/myjourney/my_journey_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,7 +23,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _fetchUserData();
-    _checkEmailVerification();
+    // Jangan tampilkan dialog verifikasi di sini karena akan mengganggu auto login
+    // Pemeriksaan verifikasi sebaiknya dilakukan setelah UI ditampilkan
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkEmailVerification();
+    });
   }
 
   void _onItemTapped(int index) {
@@ -59,12 +64,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _checkEmailVerification() async {
     User? user = FirebaseAuth.instance.currentUser;
-    
+
     if (user != null && !user.emailVerified) {
       // Email not verified - show verification dialog
       _showVerificationDialog(context, user);
     }
-    
+
     setState(() {
       _isCheckingVerification = false;
     });
@@ -422,7 +427,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCenterJourneyCompact(Color color) {
     return GestureDetector(
       onTap: () {
-        // Implement My Journey action here if needed
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const MyJourneyScreen()),
+        );
       },
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

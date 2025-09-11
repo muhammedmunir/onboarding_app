@@ -13,8 +13,6 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
-
   runApp(const MyApp());
 }
 
@@ -49,6 +47,15 @@ class AuthWrapper extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.active) {
+          if (snapshot.hasError) {
+            //Tampil jika ada error
+            return const Scaffold(
+              body: Center(
+                child: Text('Something went wrong!'),
+              ),
+            );
+          }
+
           User? user = snapshot.data;
           if (user != null) {
             return const HomeScreen();
