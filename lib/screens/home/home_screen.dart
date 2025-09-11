@@ -16,11 +16,13 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   bool _isHeaderExpanded = false;
   Map<String, dynamic>? _userData;
+  bool _isCheckingVerification = true;
 
   @override
   void initState() {
     super.initState();
     _fetchUserData();
+    _checkEmailVerification();
   }
 
   void _onItemTapped(int index) {
@@ -43,7 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
             .collection('users')
             .doc(user.uid)
             .get();
-            
+
         if (userDoc.exists) {
           setState(() {
             _userData = userDoc.data() as Map<String, dynamic>;
@@ -53,6 +55,71 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       print("Error fetching user data: $e");
     }
+  }
+
+  Future<void> _checkEmailVerification() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    
+    if (user != null && !user.emailVerified) {
+      // Email not verified - show verification dialog
+      _showVerificationDialog(context, user);
+    }
+    
+    setState(() {
+      _isCheckingVerification = false;
+    });
+  }
+
+  void _showVerificationDialog(BuildContext context, User user) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Email Not Verified'),
+          content: const Text(
+              'Please verify your email address before using the app. '
+              'Check your inbox for a verification email.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Close'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Resend Verification'),
+              onPressed: () async {
+                try {
+                  await user.sendEmailVerification();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Verification email sent!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  Navigator.of(context).pop();
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: ${e.toString()}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+            ),
+            TextButton(
+              child: const Text('Logout'),
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _signOut();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _signOut() async {
@@ -70,6 +137,15 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color.fromRGBO(224, 124, 124, 1);
+
+    // Show loading indicator while checking verification
+    if (_isCheckingVerification) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
     return Scaffold(
       body: SafeArea(
@@ -127,16 +203,20 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Icon(Icons.person, size: 40, color: Colors.grey),
                       ),
                       const SizedBox(height: 20),
-                      _buildDetailRow(Icons.person, _userData?['fullName'] ?? "Loading..."),
+                      _buildDetailRow(
+                          Icons.person, _userData?['fullName'] ?? "Loading..."),
                       const SizedBox(height: 12),
-                      _buildDetailRow(Icons.email, _userData?['email'] ?? "Loading..."),
+                      _buildDetailRow(
+                          Icons.email, _userData?['email'] ?? "Loading..."),
                       const SizedBox(height: 12),
-                      _buildDetailRow(Icons.phone, _userData?['phoneNumber'] ?? "Loading..."),
+                      _buildDetailRow(Icons.phone,
+                          _userData?['phoneNumber'] ?? "Loading..."),
                       const SizedBox(height: 12),
-                      _buildDetailRow(Icons.business, 
-                        "${_userData?['workUnit'] ?? "Loading"} | ${_userData?['workplace'] ?? "Loading"}"),
+                      _buildDetailRow(Icons.business,
+                          "${_userData?['workUnit'] ?? "Loading"} | ${_userData?['workplace'] ?? "Loading"}"),
                       const SizedBox(height: 12),
-                      _buildDetailRow(Icons.work, _userData?['workType'] ?? "Loading..."),
+                      _buildDetailRow(
+                          Icons.work, _userData?['workType'] ?? "Loading..."),
                       const SizedBox(height: 12),
                       const Icon(
                         Icons.keyboard_arrow_up,
@@ -150,7 +230,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     right: 0,
                     child: IconButton(
                       onPressed: _signOut,
-                      icon: const Icon(Icons.logout, color: Colors.white, size: 28),
+                      icon: const Icon(Icons.logout,
+                          color: Colors.white, size: 28),
                     ),
                   ),
                 ],
@@ -186,7 +267,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       const Spacer(),
                       IconButton(
                         onPressed: _signOut,
-                        icon: const Icon(Icons.logout, color: Colors.white, size: 28),
+                        icon: const Icon(Icons.logout,
+                            color: Colors.white, size: 28),
                       ),
                     ],
                   ),
@@ -209,14 +291,14 @@ class _HomeScreenState extends State<HomeScreen> {
         Icon(icon, color: Colors.white, size: 20),
         const SizedBox(width: 10),
         Text(
-            text,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-            ),
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
+          text,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
           ),
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+        ),
       ],
     );
   }
@@ -256,9 +338,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     children: [
                       const SizedBox(height: 50),
-                      _buildSmallActionCompact(SvgPicture.asset("assets/svgs/Learning Hub.svg"), "Learning\nHub", primaryColor),
+                      _buildSmallActionCompact(
+                          SvgPicture.asset("assets/svgs/Learning Hub.svg"),
+                          "Learning\nHub",
+                          primaryColor),
                       const SizedBox(height: 20),
-                      _buildSmallActionCompact(SvgPicture.asset("assets/svgs/Facilities.svg"), "Facilities\n", primaryColor),
+                      _buildSmallActionCompact(
+                          SvgPicture.asset("assets/svgs/Facilities.svg"),
+                          "Facilities\n",
+                          primaryColor),
                       const SizedBox(height: 50),
                     ],
                   ),
@@ -268,11 +356,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: Column(
                     children: [
-                      _buildSmallActionCompact(SvgPicture.asset("assets/svgs/My Document.svg"), "My\nDocument", primaryColor),
+                      _buildSmallActionCompact(
+                          SvgPicture.asset("assets/svgs/My Document.svg"),
+                          "My\nDocument",
+                          primaryColor),
                       const SizedBox(height: 20),
                       _buildCenterJourneyCompact(primaryColor),
                       const SizedBox(height: 20),
-                      _buildSmallActionCompact(SvgPicture.asset("assets/svgs/Task Manager.svg"), "Task\nManager", primaryColor),
+                      _buildSmallActionCompact(
+                          SvgPicture.asset("assets/svgs/Task Manager.svg"),
+                          "Task\nManager",
+                          primaryColor),
                     ],
                   ),
                 ),
@@ -282,9 +376,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     children: [
                       const SizedBox(height: 50),
-                      _buildSmallActionCompact(SvgPicture.asset("assets/svgs/Meet the Team.svg"), "Meet the\nTeam", primaryColor),
+                      _buildSmallActionCompact(
+                          SvgPicture.asset("assets/svgs/Meet the Team.svg"),
+                          "Meet the\nTeam",
+                          primaryColor),
                       const SizedBox(height: 20),
-                      _buildSmallActionCompact(SvgPicture.asset("assets/svgs/Buddy Chat.svg"), "Buddy\nChat", primaryColor),
+                      _buildSmallActionCompact(
+                          SvgPicture.asset("assets/svgs/Buddy Chat.svg"),
+                          "Buddy\nChat",
+                          primaryColor),
                       const SizedBox(height: 50),
                     ],
                   ),
@@ -370,7 +470,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         "My\nJourney",
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold),
                       )
                     ],
                   ),

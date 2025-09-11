@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:onboarding_app/screens/auth/login_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:onboarding_app/screens/home/home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -16,7 +18,7 @@ class _SplashScreenState extends State<SplashScreen> {
     // Navigasi ke skrin log masuk selepas 3 saat
     Timer(const Duration(seconds: 5), () {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        MaterialPageRoute(builder: (_) => AuthWrapper()),
       );
     });
   }
@@ -55,6 +57,29 @@ class _SplashScreenState extends State<SplashScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.active) {
+          User? user = snapshot.data;
+          if (user != null) {
+            return const HomeScreen();
+          }
+          return const LoginScreen();
+        }
+        return const Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+      },
     );
   }
 }

@@ -49,6 +49,8 @@ dependencies:
   curved_navigation_bar: ^1.0.6
 
 dev_dependencies:
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.4
   flutter_test:
     sdk: flutter
 
@@ -58,6 +60,49 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^4.0.0
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "assets/icon/icon_background.png"
+  adaptive_icon_foreground: "assets/icon/icon_mini.png"
+  min_sdk_android: 21 # android min sdk min:16, default 21
+  web:
+    generate: true
+    image_path: "assets/icon/icon_mini.png"
+    background_image: "assets/images/background_Splash.jpg"
+
+# flutter_icons:
+#   android: true
+#   ios: true
+#   web: true
+
+#   image_path: assets/images/logo_OnboardingX_icon_mini.png
+#   adaptive_icon_background: assets/images/background_Splash.jpg
+#   adaptive_icon_foreground: assets/images/logo_OnboardingX_icon_mini.png
+#   remove_alpha_ios: true
+
+flutter_native_splash:
+  android: true
+  ios: true
+  web: true
+
+  #color: "#ffffff"
+  background_image: assets/images/background_Splash.jpg
+  image: assets/images/logo_OnboardingX_icon.png
+  branding: assets/images/logo_tnb.png
+
+  branding_bottom_padding_ios: 35
+  branding_bottom_padding_android: 35
+
+  android_12:
+    #color: "#ffffff"
+    background_image: assets/images/background_Splash.jpg
+    image: assets/images/logo_OnboardingX_icon.png
+    branding: assets/images/logo_tnb.png
+
+    branding_bottom_padding: 35   
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -73,7 +118,7 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/images/
-    - assets/icons/
+    - assets/icon/
     - assets/svgs/
 
   # An image asset can refer to one or more resolution-specific "variants", see
