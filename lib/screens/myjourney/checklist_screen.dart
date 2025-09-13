@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ChecklistScreen extends StatefulWidget {
   const ChecklistScreen({super.key});
@@ -9,6 +11,10 @@ class ChecklistScreen extends StatefulWidget {
 }
 
 class _ChecklistScreenState extends State<ChecklistScreen> {
+  // Firebase instances
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  
   // Project and task data
   List<Map<String, dynamic>> _projects = [];
   List<Map<String, dynamic>> _tasks = [];
@@ -25,8 +31,9 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   @override
   void initState() {
     super.initState();
-    // Load sample data
-    _loadSampleData();
+    // Load data from Firebase
+    _loadProjects();
+    _loadTasks();
   }
 
   @override
@@ -37,50 +44,136 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     super.dispose();
   }
 
-  void _loadSampleData() {
-    // Sample projects
-    _projects = [
-      {
-        'id': 1,
-        'title': 'Weekly Checklist',
-        'startDate': DateTime(2023, 5, 1),
-        'endDate': DateTime(2023, 5, 7),
-      },
-      {
-        'id': 2,
-        'title': 'Daily Tasks',
-        'startDate': DateTime(2023, 5, 2),
-        'endDate': DateTime(2023, 5, 2),
-      },
-    ];
+  Future<void> _loadProjects() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        final querySnapshot = await _firestore
+            .collection('projects')
+            .where('userId', isEqualTo: user.uid)
+            .get();
 
-    // Sample tasks
-    _tasks = [
-      {
-        'id': 1,
-        'projectId': 1,
-        'title': 'Task 1',
-        'description': 'First task description',
-        'dueDate': DateTime(2023, 5, 3),
-        'completed': false,
-      },
-      {
-        'id': 2,
-        'projectId': 1,
-        'title': 'Task 2',
-        'description': 'Second task description',
-        'dueDate': DateTime(2023, 5, 4),
-        'completed': true,
-      },
-      {
-        'id': 3,
-        'projectId': 2,
-        'title': 'Task 3',
-        'description': 'Third task description',
-        'dueDate': DateTime(2023, 5, 2),
-        'completed': false,
-      },
-    ];
+        setState(() {
+          _projects = querySnapshot.docs.map((doc) {
+            final data = doc.data();
+            return {
+              'id': doc.id,
+              'title': data['title'],
+              'startDate': (data['startDate'] as Timestamp).toDate(),
+              'endDate': (data['endDate'] as Timestamp).toDate(),
+            };
+          }).toList();
+        });
+      }
+    } catch (e) {
+      print('Error loading projects: $e');
+    }
+  }
+
+  Future<void> _loadTasks() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        final querySnapshot = await _firestore
+            .collection('tasks')
+            .where('userId', isEqualTo: user.uid)
+            .get();
+
+        setState(() {
+          _tasks = querySnapshot.docs.map((doc) {
+            final data = doc.data();
+            return {
+              'id': doc.id,
+              'projectId': data['projectId'],
+              'title': data['title'],
+              'description': data['description'],
+              'dueDate': (data['dueDate'] as Timestamp).toDate(),
+              'completed': data['completed'],
+            };
+          }).toList();
+        });
+      }
+    } catch (e) {
+      print('Error loading tasks: $e');
+    }
+  }
+
+  Future<void> _addProject(Map<String, dynamic> project) async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        await _firestore.collection('projects').add({
+          'title': project['title'],
+          'startDate': Timestamp.fromDate(project['startDate']),
+          'endDate': Timestamp.fromDate(project['endDate']),
+          'userId': user.uid,
+          'createdAt': Timestamp.now(),
+        });
+        _loadProjects(); // Reload projects after adding
+      }
+    } catch (e) {
+      print('Error adding project: $e');
+    }
+  }
+
+  Future<void> _addTask(Map<String, dynamic> task) async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        await _firestore.collection('tasks').add({
+          'projectId': task['projectId'],
+          'title': task['title'],
+          'description': task['description'],
+          'dueDate': Timestamp.fromDate(task['dueDate']),
+          'completed': task['completed'],
+          'userId': user.uid,
+          'createdAt': Timestamp.now(),
+        });
+        _loadTasks(); // Reload tasks after adding
+      }
+    } catch (e) {
+      print('Error adding task: $e');
+    }
+  }
+
+  Future<void> _updateTask(String taskId, Map<String, dynamic> updates) async {
+    try {
+      await _firestore.collection('tasks').doc(taskId).update(updates);
+      _loadTasks(); // Reload tasks after updating
+    } catch (e) {
+      print('Error updating task: $e');
+    }
+  }
+
+  Future<void> _deleteTask(String taskId) async {
+    try {
+      await _firestore.collection('tasks').doc(taskId).delete();
+      _loadTasks(); // Reload tasks after deleting
+    } catch (e) {
+      print('Error deleting task: $e');
+    }
+  }
+
+  Future<void> _deleteProject(String projectId) async {
+    try {
+      // First delete all tasks associated with this project
+      final tasksQuery = await _firestore
+          .collection('tasks')
+          .where('projectId', isEqualTo: projectId)
+          .get();
+
+      for (var doc in tasksQuery.docs) {
+        await doc.reference.delete();
+      }
+
+      // Then delete the project
+      await _firestore.collection('projects').doc(projectId).delete();
+      
+      _loadProjects(); // Reload projects after deleting
+      _loadTasks(); // Reload tasks after deleting
+    } catch (e) {
+      print('Error deleting project: $e');
+    }
   }
 
   void _showAddOptionsDialog() {
@@ -217,17 +310,13 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                     if (_projectTitleController.text.isNotEmpty) {
                       // Create new project
                       final newProject = {
-                        'id': DateTime.now().millisecondsSinceEpoch,
                         'title': _projectTitleController.text,
                         'startDate': _projectStartDate,
                         'endDate': _projectEndDate,
                       };
 
-                      // Add to projects list
-                      setState(() {
-                        _projects.add(newProject);
-                        _selectedProject = newProject;
-                      });
+                      // Add to Firebase
+                      _addProject(newProject);
 
                       Navigator.pop(context);
                     }
@@ -359,7 +448,6 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                     if (_taskTitleController.text.isNotEmpty) {
                       // Create new task
                       final newTask = {
-                        'id': DateTime.now().millisecondsSinceEpoch,
                         'projectId': _selectedProject?['id'] ?? _projects.first['id'],
                         'title': _taskTitleController.text,
                         'description': _taskDescriptionController.text,
@@ -367,10 +455,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                         'completed': false,
                       };
 
-                      // Add to tasks list
-                      setState(() {
-                        _tasks.add(newTask);
-                      });
+                      // Add to Firebase
+                      _addTask(newTask);
 
                       Navigator.pop(context);
                     }
@@ -500,18 +586,12 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                 ElevatedButton(
                   onPressed: () {
                     if (_taskTitleController.text.isNotEmpty) {
-                      // Update task
-                      setState(() {
-                        final index = _tasks.indexWhere((t) => t['id'] == task['id']);
-                        if (index != -1) {
-                          _tasks[index] = {
-                            ..._tasks[index],
-                            'title': _taskTitleController.text,
-                            'description': _taskDescriptionController.text,
-                            'dueDate': _taskDueDate,
-                            'projectId': _selectedProject?['id'],
-                          };
-                        }
+                      // Update task in Firebase
+                      _updateTask(task['id'], {
+                        'title': _taskTitleController.text,
+                        'description': _taskDescriptionController.text,
+                        'dueDate': Timestamp.fromDate(_taskDueDate),
+                        'projectId': _selectedProject?['id'],
                       });
 
                       Navigator.pop(context);
@@ -530,13 +610,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
   }
 
-  void _deleteTask(int taskId) {
-    setState(() {
-      _tasks.removeWhere((task) => task['id'] == taskId);
-    });
-  }
-
-  void _confirmDeleteTask(int taskId) {
+  void _confirmDeleteTask(String taskId) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -562,7 +636,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
   }
 
-  void _deleteProject(int projectId) {
+  void _confirmDeleteProject(String projectId) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -576,18 +650,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                setState(() {
-                  // Delete the project
-                  _projects.removeWhere((project) => project['id'] == projectId);
-                  
-                  // Delete all tasks associated with this project
-                  _tasks.removeWhere((task) => task['projectId'] == projectId);
-                  
-                  // Clear selection if the selected project was deleted
-                  if (_selectedProject != null && _selectedProject!['id'] == projectId) {
-                    _selectedProject = null;
-                  }
-                });
+                _deleteProject(projectId);
                 Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -611,34 +674,35 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     });
   }
 
-  List<Map<String, dynamic>> _getTasksForProject(int projectId) {
+  List<Map<String, dynamic>> _getTasksForProject(String projectId) {
     return _tasks.where((task) => task['projectId'] == projectId).toList();
   }
 
-  int _getCompletedTaskCount(int projectId) {
+  List<Map<String, dynamic>> _getIncompleteTasksForProject(String projectId) {
+    return _tasks.where((task) => task['projectId'] == projectId && !task['completed']).toList();
+  }
+
+  List<Map<String, dynamic>> _getCompletedTasksForProject(String projectId) {
+    return _tasks.where((task) => task['projectId'] == projectId && task['completed']).toList();
+  }
+
+  int _getCompletedTaskCount(String projectId) {
     return _getTasksForProject(projectId).where((task) => task['completed']).length;
   }
 
-  int _getTotalTaskCount(int projectId) {
+  int _getTotalTaskCount(String projectId) {
     return _getTasksForProject(projectId).length;
+  }
+
+  void _toggleTaskCompletion(Map<String, dynamic> task) {
+    _updateTask(task['id'], {
+      'completed': !task['completed'],
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // appBar: AppBar(
-      //   title: const Text('Checklist', style: TextStyle(fontWeight: FontWeight.bold)),
-      //   backgroundColor: const Color(0xFFE07C7C),
-      //   foregroundColor: Colors.white,
-      //   actions: [
-      //     if (_selectedProject != null)
-      //       IconButton(
-      //         icon: const Icon(Icons.close),
-      //         onPressed: _clearSelection,
-      //         tooltip: 'Clear Selection',
-      //       ),
-      //   ],
-      // ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -656,178 +720,178 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
           
           // Projects list
           SizedBox(
-  height: 140, // Slightly increased height for better appearance
-  child: ListView.builder(
-    scrollDirection: Axis.horizontal,
-    padding: const EdgeInsets.symmetric(horizontal: 16),
-    itemCount: _projects.length,
-    itemBuilder: (context, index) {
-      final project = _projects[index];
-      final startDate = DateFormat('d MMM').format(project['startDate']);
-      final endDate = DateFormat('d MMM').format(project['endDate']);
-      final completedTasks = _getCompletedTaskCount(project['id']);
-      final totalTasks = _getTotalTaskCount(project['id']);
-      final progress = totalTasks > 0 ? completedTasks / totalTasks : 0;
-      final isSelected = _selectedProject != null && _selectedProject!['id'] == project['id'];
-      
-      return GestureDetector(
-        onTap: () => _selectProject(project),
-        child: Container(
-          width: 200, // Slightly wider for better content fit
-          margin: const EdgeInsets.only(right: 16),
-          decoration: BoxDecoration(
-            gradient: isSelected 
-                ? LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      const Color(0xFFE07C7C).withOpacity(0.3),
-                      const Color(0xFFE07C7C).withOpacity(0.1),
-                    ],
-                  )
-                : null,
-            color: isSelected ? null : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: isSelected 
-                ? Border.all(color: const Color(0xFFE07C7C), width: 2)
-                : Border.all(color: Colors.grey.shade200, width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.15),
-                spreadRadius: 1,
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Project title with icon
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.folder,
-                          color: isSelected ? const Color(0xFFE07C7C) : Colors.grey,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            project['title'],
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isSelected ? const Color(0xFFE07C7C) : Colors.black,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+            height: 140,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _projects.length,
+              itemBuilder: (context, index) {
+                final project = _projects[index];
+                final startDate = DateFormat('d MMM').format(project['startDate']);
+                final endDate = DateFormat('d MMM').format(project['endDate']);
+                final completedTasks = _getCompletedTaskCount(project['id']);
+                final totalTasks = _getTotalTaskCount(project['id']);
+                final progress = totalTasks > 0 ? completedTasks / totalTasks : 0;
+                final isSelected = _selectedProject != null && _selectedProject!['id'] == project['id'];
+                
+                return GestureDetector(
+                  onTap: () => _selectProject(project),
+                  child: Container(
+                    width: 200,
+                    margin: const EdgeInsets.only(right: 16),
+                    decoration: BoxDecoration(
+                      gradient: isSelected 
+                          ? LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                const Color(0xFFE07C7C).withOpacity(0.3),
+                                const Color(0xFFE07C7C).withOpacity(0.1),
+                              ],
+                            )
+                          : null,
+                      color: isSelected ? null : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: isSelected 
+                          ? Border.all(color: const Color(0xFFE07C7C), width: 2)
+                          : Border.all(color: Colors.grey.shade200, width: 1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.15),
+                          spreadRadius: 1,
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
                         ),
                       ],
                     ),
-                    
-                    // Date range
-                    Row(
+                    child: Stack(
                       children: [
-                        Icon(Icons.calendar_today, size: 12, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$startDate - $endDate',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    // Progress section
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Progress text
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Progress',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // Project title with icon
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.folder,
+                                    color: isSelected ? const Color(0xFFE07C7C) : Colors.grey,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      project['title'],
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: isSelected ? const Color(0xFFE07C7C) : Colors.black,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                            Text(
-                              '${(progress * 100).toInt()}%',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: isSelected ? const Color(0xFFE07C7C) : Colors.black,
+                              
+                              // Date range
+                              Row(
+                                children: [
+                                  Icon(Icons.calendar_today, size: 12, color: Colors.grey[600]),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '$startDate - $endDate',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        
-                        // Progress bar
-                        LinearProgressIndicator(
-                          value: progress.toDouble(),
-                          backgroundColor: Colors.grey[300],
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            progress == 1 
-                              ? Colors.green 
-                              : const Color(0xFFE07C7C),
+                              
+                              // Progress section
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Progress text
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Progress',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                      Text(
+                                        '${(progress * 100).toInt()}%',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: isSelected ? const Color(0xFFE07C7C) : Colors.black,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  
+                                  // Progress bar
+                                  LinearProgressIndicator(
+                                    value: progress.toDouble(),
+                                    backgroundColor: Colors.grey[300],
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      progress == 1 
+                                        ? Colors.green 
+                                        : const Color(0xFFE07C7C),
+                                    ),
+                                    borderRadius: BorderRadius.circular(4),
+                                    minHeight: 6,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  
+                                  // Completed tasks count
+                                  Text(
+                                    '$completedTasks/$totalTasks tasks completed',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                          borderRadius: BorderRadius.circular(4),
-                          minHeight: 6,
                         ),
-                        const SizedBox(height: 4),
                         
-                        // Completed tasks count
-                        Text(
-                          '$completedTasks/$totalTasks tasks completed',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey[600],
+                        // Delete button
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.close, size: 14),
+                              onPressed: () => _confirmDeleteProject(project['id']),
+                              padding: EdgeInsets.zero,
+                              color: Colors.grey[700],
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              
-              // Delete button
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.2),
-                    shape: BoxShape.circle,
                   ),
-                  child: IconButton(
-                    icon: const Icon(Icons.close, size: 14),
-                    onPressed: () => _deleteProject(project['id']),
-                    padding: EdgeInsets.zero,
-                    color: Colors.grey[700],
-                  ),
-                ),
-              ),
-            ],
+                );
+              },
+            ),
           ),
-        ),
-      );
-    },
-  ),
-),
 
           // Task List section (shown when a project is selected)
           if (_selectedProject != null) ...[
@@ -882,135 +946,49 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                         ],
                       ),
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      itemCount: _getTasksForProject(_selectedProject!['id']).length,
-                      itemBuilder: (context, index) {
-                        final task = _getTasksForProject(_selectedProject!['id'])[index];
-                        final dueDate = DateFormat('MMM d, yyyy').format(task['dueDate']);
-                        
-                        return Dismissible(
-                          key: Key(task['id'].toString()),
-                          direction: DismissDirection.endToStart,
-                          background: Container(
-                            color: Colors.red,
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 20),
-                            child: const Icon(Icons.delete, color: Colors.white),
-                          ),
-                          confirmDismiss: (direction) async {
-                            // Show confirmation dialog before deleting
-                            return await showDialog(
-                              context: context,
-                              builder: (BuildContext context) {
-                                return AlertDialog(
-                                  title: const Text('Confirm Delete'),
-                                  content: const Text('Are you sure you want to delete this task?'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.of(context).pop(false),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    ElevatedButton(
-                                      onPressed: () => Navigator.of(context).pop(true),
-                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                      child: const Text('Delete'),
-                                    ),
-                                  ],
-                                );
-                              },
-                            );
-                          },
-                          onDismissed: (direction) {
-                            _deleteTask(task['id']);
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey.shade200),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.1),
-                                  spreadRadius: 1,
-                                  blurRadius: 2,
-                                  offset: const Offset(0, 1),
+                  : SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Incomplete Tasks Section
+                          if (_getIncompleteTasksForProject(_selectedProject!['id']).isNotEmpty) ...[
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                              child: Text(
+                                'Incomplete Tasks',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFE07C7C),
                                 ),
-                              ],
+                              ),
                             ),
-                            child: Row(
-                              children: [
-                                Checkbox(
-                                  value: task['completed'],
-                                  onChanged: (value) {
-                                    setState(() {
-                                      final taskIndex = _tasks.indexWhere((t) => t['id'] == task['id']);
-                                      if (taskIndex != -1) {
-                                        _tasks[taskIndex]['completed'] = value;
-                                      }
-                                    });
-                                  },
-                                  activeColor: const Color(0xFFE07C7C),
+                            ..._getIncompleteTasksForProject(_selectedProject!['id']).map((task) {
+                              final dueDate = DateFormat('MMM d, yyyy').format(task['dueDate']);
+                              return _buildTaskItem(task, dueDate);
+                            }).toList(),
+                          ],
+                          
+                          // Completed Tasks Section
+                          if (_getCompletedTasksForProject(_selectedProject!['id']).isNotEmpty) ...[
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                              child: Text(
+                                'Completed Tasks',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        task['title'],
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w500,
-                                          decoration: task['completed'] 
-                                              ? TextDecoration.lineThrough 
-                                              : null,
-                                          color: task['completed'] 
-                                              ? Colors.grey 
-                                              : Colors.black,
-                                        ),
-                                      ),
-                                      if (task['description'] != null && task['description'].isNotEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 4),
-                                          child: Text(
-                                            task['description'],
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey[600],
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 4),
-                                        child: Text(
-                                          'Due: $dueDate',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: task['completed'] ? Colors.grey : const Color(0xFFE07C7C),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit, size: 20, color: Colors.grey),
-                                  onPressed: () => _showEditTaskDialog(task),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, size: 20, color: Colors.grey),
-                                  onPressed: () => _confirmDeleteTask(task['id']),
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
+                            ..._getCompletedTasksForProject(_selectedProject!['id']).map((task) {
+                              final dueDate = DateFormat('MMM d, yyyy').format(task['dueDate']);
+                              return _buildTaskItem(task, dueDate);
+                            }).toList(),
+                          ],
+                        ],
+                      ),
                     ),
             ),
           ] else if (_projects.isNotEmpty) ...[
@@ -1066,6 +1044,143 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         onPressed: _showAddOptionsDialog,
         backgroundColor: const Color(0xFFE07C7C),
         child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _buildTaskItem(Map<String, dynamic> task, String dueDate) {
+    return Dismissible(
+      key: Key(task['id'].toString()),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        color: Colors.red,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      confirmDismiss: (direction) async {
+        // Show confirmation dialog before deleting
+        return await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Confirm Delete'),
+              content: const Text('Are you sure you want to delete this task?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('Delete'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+      onDismissed: (direction) {
+        _deleteTask(task['id']);
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: task['completed'] ? Colors.green.shade100 : Colors.grey.shade200,
+            width: task['completed'] ? 1.5 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 2,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Checkbox(
+              value: task['completed'],
+              onChanged: (value) {
+                _toggleTaskCompletion(task);
+              },
+              activeColor: const Color(0xFFE07C7C),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    task['title'],
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      decoration: task['completed'] 
+                          ? null 
+                          : null,
+                      color: task['completed'] 
+                          ? Colors.grey 
+                          : Colors.black,
+                    ),
+                  ),
+                  if (task['description'] != null && task['description'].isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        task['description'],
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                          decoration: task['completed'] 
+                              ? null
+                              : null,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today,
+                          size: 12,
+                          color: task['completed'] ? Colors.grey : const Color(0xFFE07C7C),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Due: $dueDate',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: task['completed'] ? Colors.grey : const Color(0xFFE07C7C),
+                            decoration: task['completed'] 
+                                ? null
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: Icon(Icons.edit, size: 20, color: Colors.grey[600]),
+              onPressed: () => _showEditTaskDialog(task),
+            ),
+          ],
+        ),
       ),
     );
   }

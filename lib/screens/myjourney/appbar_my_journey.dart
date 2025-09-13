@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'timeline_screen.dart';
 import 'checklist_screen.dart';
 
-class MyJourneyScreen extends StatefulWidget {
-  const MyJourneyScreen({super.key});
+class AppBarMyJourney extends StatefulWidget {
+  const AppBarMyJourney({super.key});
 
   @override
-  State<MyJourneyScreen> createState() => _MyJourneyScreenState();
+  State<AppBarMyJourney> createState() => _AppBarMyJourneyState();
 }
 
-class _MyJourneyScreenState extends State<MyJourneyScreen> with SingleTickerProviderStateMixin {
+class _AppBarMyJourneyState extends State<AppBarMyJourney> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -29,12 +29,12 @@ class _MyJourneyScreenState extends State<MyJourneyScreen> with SingleTickerProv
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'My Journey',
+          'Learning Hub',
           style: TextStyle(color: Colors.black),
         ),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: Colors.white,
+        backgroundColor: const Color.fromARGB(0, 255, 255, 255),
         foregroundColor: Colors.black,
         automaticallyImplyLeading: false,
         leading: Center(

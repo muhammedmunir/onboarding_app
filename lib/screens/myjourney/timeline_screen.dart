@@ -1,6 +1,78 @@
+// lib/screens/myjourney/timeline_screen.dart
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+/// Parse event date which could be Timestamp, DateTime or String
+DateTime _parseEventDate(dynamic raw) {
+  if (raw == null) return DateTime.now();
+
+  // Firestore Timestamp
+  if (raw is Timestamp) {
+    return raw.toDate();
+  }
+
+  // Already DateTime
+  if (raw is DateTime) {
+    return raw;
+  }
+
+  // If string - try multiple parsing strategies
+  if (raw is String) {
+    // 1) Try ISO8601
+    final iso = DateTime.tryParse(raw);
+    if (iso != null) return iso;
+
+    // 2) Try to extract "d MMMM yyyy at HH:mm:ss" pattern (e.g. "12 September 2025 at 12:16:00 UTC+8")
+    try {
+      final parts = raw.split(' at ');
+      final datePart = parts.isNotEmpty ? parts[0].trim() : raw;
+      DateTime baseDate = DateFormat('d MMMM yyyy').parseLoose(datePart);
+
+      if (parts.length > 1) {
+        final timePart = parts[1];
+        // extract hh:mm:ss via regex
+        final match = RegExp(r'(\d{1,2}:\d{2}:\d{2})').firstMatch(timePart);
+        if (match != null) {
+          final hm = match.group(1)!;
+          final tParts = hm.split(':').map((e) => int.tryParse(e) ?? 0).toList();
+          if (tParts.length >= 3) {
+            baseDate = DateTime(baseDate.year, baseDate.month, baseDate.day, tParts[0], tParts[1], tParts[2]);
+            return baseDate;
+          }
+        }
+        // fallback: try HH:mm
+        final match2 = RegExp(r'(\d{1,2}:\d{2})').firstMatch(timePart);
+        if (match2 != null) {
+          final hm2 = match2.group(1)!;
+          final tParts = hm2.split(':').map((e) => int.tryParse(e) ?? 0).toList();
+          baseDate = DateTime(baseDate.year, baseDate.month, baseDate.day, tParts[0], tParts[1]);
+          return baseDate;
+        }
+      }
+
+      return baseDate;
+    } catch (_) {
+      // ignore and fallback
+    }
+
+    // 3) As final fallback: try parsing only d MMMM yyyy
+    try {
+      return DateFormat('d MMMM yyyy').parseLoose(raw);
+    } catch (_) {}
+
+    // 4) Last resort: now
+    return DateTime.now();
+  }
+
+  // Unknown type -> fallback
+  return DateTime.now();
+}
 
 class TimelineScreen extends StatefulWidget {
   const TimelineScreen({super.key});
@@ -15,39 +87,11 @@ class _TimelineScreenState extends State<TimelineScreen> {
   DateTime? _selectedDate;
   final ScrollController _scrollController = ScrollController();
 
-  // Sample data for events
-  List<Map<String, dynamic>> _events = [
-    {
-      'title': 'Weekly Meeting',
-      'startTime': '10:00 AM',
-      'endTime': '11:30 AM',
-      'location': 'Platinum Tower',
-      'description':
-          'Meeting place at Platinum Tower. Please bring your laptop and note book for...',
-      'link': 'https://meet.google.com/abc-xyz-123',
-      'date': DateTime(2025, 9, 12, 10, 0), // September 12, 2025, 10:00 AM
-    },
-    {
-      'title': 'Seminar Flutterflow',
-      'startTime': '2:00 PM',
-      'endTime': '4:00 PM',
-      'location': 'Warisan Tower',
-      'description':
-          'Seminar place at Warisan Tower. Please bring your laptop and note book for...',
-      'link': '',
-      'date': DateTime(2025, 9, 12, 14, 0), // September 12, 2025, 2:00 PM
-    },
-    {
-      'title': 'Meeting with Client',
-      'startTime': '4:30 PM',
-      'endTime': '5:30 PM',
-      'location': 'UOA Tower',
-      'description':
-          'Meeting place at UOA Tower. Please bring your laptop and note book for...',
-      'link': 'https://zoom.us/j/123456789',
-      'date': DateTime(2025, 9, 12, 16, 30), // September 12, 2025, 4:30 PM
-    },
-  ];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  User? _currentUser;
+  List<Map<String, dynamic>> _events = [];
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _eventsSubscription;
+  StreamSubscription<User?>? _authSubscription;
 
   // Controllers for the add event form
   final TextEditingController _titleController = TextEditingController();
@@ -67,6 +111,22 @@ class _TimelineScreenState extends State<TimelineScreen> {
     _selectedDate = DateTime.now();
     _generateVisibleDays();
 
+    // Listen to auth changes - start listener only when user is logged in
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      _currentUser = user;
+      if (_currentUser != null) {
+        _setupEventsListener();
+      } else {
+        _eventsSubscription?.cancel();
+        _eventsSubscription = null;
+        if (mounted) {
+          setState(() {
+            _events = [];
+          });
+        }
+      }
+    });
+
     // Scroll to current date after initial build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToCurrentDate();
@@ -75,6 +135,8 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
   @override
   void dispose() {
+    _eventsSubscription?.cancel();
+    _authSubscription?.cancel();
     _scrollController.dispose();
     _titleController.dispose();
     _startTimeController.dispose();
@@ -83,6 +145,63 @@ class _TimelineScreenState extends State<TimelineScreen> {
     _descriptionController.dispose();
     _linkController.dispose();
     super.dispose();
+  }
+
+  void _setupEventsListener() {
+    // cancel existing subscription
+    _eventsSubscription?.cancel();
+
+    if (_currentUser == null) return;
+
+    try {
+      final q = _firestore.collection('events').where('userId', isEqualTo: _currentUser!.uid);
+
+      _eventsSubscription = q.snapshots().listen((QuerySnapshot snapshot) {
+        // build loaded list first
+        final List<Map<String, dynamic>> loaded = snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+
+          // Parse date safely (Timestamp, DateTime, or custom string)
+          final rawDate = data['date'];
+          final DateTime eventDate = _parseEventDate(rawDate);
+
+          return {
+            'id': doc.id,
+            'title': data['title'] ?? '',
+            'startTime': data['startTime'] ?? '',
+            // accept 'endTime' or 'emTime'
+            'endTime': (data['endTime'] ?? data['emTime']) ?? '',
+            'location': data['location'] ?? '',
+            'description': data['description'] ?? '',
+            'link': data['link'] ?? '',
+            'date': eventDate,
+          };
+        }).toList();
+
+        // sort by date/time
+        loaded.sort((a, b) => (a['date'] as DateTime).compareTo(b['date'] as DateTime));
+
+        if (!mounted) return;
+        setState(() {
+          _events = loaded;
+        });
+
+        debugPrint('Loaded ${loaded.length} events');
+      }, onError: (error) {
+        debugPrint('Error listening to events: $error');
+        if (!mounted) return;
+        final msg = error.toString();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading events: $msg')),
+        );
+      });
+    } catch (e) {
+      debugPrint('Failed to start events listener: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to start events listener: ${e.toString()}')),
+      );
+    }
   }
 
   void _generateVisibleDays() {
@@ -97,8 +216,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
   }
 
   void _scrollToCurrentDate() {
-    if (_currentDate.month == DateTime.now().month &&
-        _currentDate.year == DateTime.now().year) {
+    if (_currentDate.month == DateTime.now().month && _currentDate.year == DateTime.now().year) {
       final currentDateIndex = _visibleDays.indexWhere((date) =>
           date.day == DateTime.now().day &&
           date.month == DateTime.now().month &&
@@ -116,6 +234,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
   }
 
   void _goToPreviousMonth() {
+    if (!mounted) return;
     setState(() {
       _currentDate = DateTime(_currentDate.year, _currentDate.month - 1, 1);
       _generateVisibleDays();
@@ -127,6 +246,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
   }
 
   void _goToNextMonth() {
+    if (!mounted) return;
     setState(() {
       _currentDate = DateTime(_currentDate.year, _currentDate.month + 1, 1);
       _generateVisibleDays();
@@ -155,23 +275,22 @@ class _TimelineScreenState extends State<TimelineScreen> {
                     IconButton(
                       icon: const Icon(Icons.arrow_back_ios),
                       onPressed: () {
+                        if (!mounted) return;
                         setState(() {
-                          _currentDate = DateTime(
-                              _currentDate.year - 1, _currentDate.month, 1);
+                          _currentDate = DateTime(_currentDate.year - 1, _currentDate.month, 1);
                         });
                       },
                     ),
                     Text(
                       _currentDate.year.toString(),
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     IconButton(
                       icon: const Icon(Icons.arrow_forward_ios),
                       onPressed: () {
+                        if (!mounted) return;
                         setState(() {
-                          _currentDate = DateTime(
-                              _currentDate.year + 1, _currentDate.month, 1);
+                          _currentDate = DateTime(_currentDate.year + 1, _currentDate.month, 1);
                         });
                       },
                     ),
@@ -188,17 +307,16 @@ class _TimelineScreenState extends State<TimelineScreen> {
                   itemCount: 12,
                   itemBuilder: (context, index) {
                     final month = index + 1;
-                    final monthName =
-                        DateFormat('MMM').format(DateTime(2023, month, 1));
+                    final monthName = DateFormat('MMM').format(DateTime(2023, month, 1));
                     final isCurrentMonth = month == _currentDate.month;
 
                     return InkWell(
                       onTap: () {
+                        if (!mounted) return;
                         setState(() {
                           _currentDate = DateTime(_currentDate.year, month, 1);
                           _generateVisibleDays();
-                          _selectedDate = DateTime(
-                              _currentDate.year, _currentDate.month, 1);
+                          _selectedDate = DateTime(_currentDate.year, _currentDate.month, 1);
                           Navigator.pop(context);
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             _scrollController.jumpTo(0);
@@ -208,16 +326,14 @@ class _TimelineScreenState extends State<TimelineScreen> {
                       child: Container(
                         margin: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color:
-                              isCurrentMonth ? Colors.blue : Colors.transparent,
+                          color: isCurrentMonth ? Colors.blue : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Center(
                           child: Text(
                             monthName,
                             style: TextStyle(
-                              color:
-                                  isCurrentMonth ? Colors.white : Colors.black,
+                              color: isCurrentMonth ? Colors.white : Colors.black,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -238,189 +354,194 @@ class _TimelineScreenState extends State<TimelineScreen> {
     // Reset form fields
     _titleController.clear();
     _startTimeController.text = DateFormat('h:mm a').format(DateTime.now());
-    _endTimeController.text = DateFormat('h:mm a')
-        .format(DateTime.now().add(const Duration(hours: 1)));
+    _endTimeController.text = DateFormat('h:mm a').format(DateTime.now().add(const Duration(hours: 1)));
     _locationController.clear();
     _descriptionController.clear();
     _linkController.clear();
     _newEventDate = _selectedDate ?? DateTime.now();
     _newEventStartTime = TimeOfDay.now();
-    _newEventEndTime = TimeOfDay(
-        hour: TimeOfDay.now().hour + 1, minute: TimeOfDay.now().minute);
+    _newEventEndTime = TimeOfDay(hour: TimeOfDay.now().hour + 1, minute: TimeOfDay.now().minute);
 
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Add New Event'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: _titleController,
-                      decoration: const InputDecoration(
-                        labelText: 'Title *',
-                        border: OutlineInputBorder(),
-                      ),
+        return StatefulBuilder(builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Add New Event'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: _titleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Title *',
+                      border: OutlineInputBorder(),
                     ),
-                    const SizedBox(height: 16),
-                    // Date selection
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () async {
-                              final DateTime? pickedDate = await showDatePicker(
-                                context: context,
-                                initialDate: _newEventDate,
-                                firstDate: DateTime(2000),
-                                lastDate: DateTime(2100),
-                              );
-                              if (pickedDate != null) {
-                                setState(() {
-                                  _newEventDate = pickedDate;
-                                });
-                              }
-                            },
-                            child: Text(
-                              DateFormat('MMM d, yyyy').format(_newEventDate),
-                              style: const TextStyle(fontSize: 16),
-                            ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Date selection
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () async {
+                            final DateTime? pickedDate = await showDatePicker(
+                              context: context,
+                              initialDate: _newEventDate,
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (pickedDate != null) {
+                              setState(() {
+                                _newEventDate = pickedDate;
+                              });
+                            }
+                          },
+                          child: Text(
+                            DateFormat('MMM d, yyyy').format(_newEventDate),
+                            style: const TextStyle(fontSize: 16),
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    // Start and end time
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _startTimeController,
-                            readOnly: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Start Time *',
-                              border: OutlineInputBorder(),
-                            ),
-                            onTap: () async {
-                              final TimeOfDay? pickedTime =
-                                  await showTimePicker(
-                                context: context,
-                                initialTime: _newEventStartTime,
-                              );
-                              if (pickedTime != null) {
-                                setState(() {
-                                  _newEventStartTime = pickedTime;
-                                  _startTimeController.text =
-                                      pickedTime.format(context);
-                                });
-                              }
-                            },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Start and end time
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _startTimeController,
+                          readOnly: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Start Time *',
+                            border: OutlineInputBorder(),
                           ),
+                          onTap: () async {
+                            final TimeOfDay? pickedTime = await showTimePicker(
+                              context: context,
+                              initialTime: _newEventStartTime,
+                            );
+                            if (pickedTime != null) {
+                              setState(() {
+                                _newEventStartTime = pickedTime;
+                                _startTimeController.text = pickedTime.format(context);
+                              });
+                            }
+                          },
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: TextField(
-                            controller: _endTimeController,
-                            readOnly: true,
-                            decoration: const InputDecoration(
-                              labelText: 'End Time *',
-                              border: OutlineInputBorder(),
-                            ),
-                            onTap: () async {
-                              final TimeOfDay? pickedTime =
-                                  await showTimePicker(
-                                context: context,
-                                initialTime: _newEventEndTime,
-                              );
-                              if (pickedTime != null) {
-                                setState(() {
-                                  _newEventEndTime = pickedTime;
-                                  _endTimeController.text =
-                                      pickedTime.format(context);
-                                });
-                              }
-                            },
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextField(
+                          controller: _endTimeController,
+                          readOnly: true,
+                          decoration: const InputDecoration(
+                            labelText: 'End Time *',
+                            border: OutlineInputBorder(),
                           ),
+                          onTap: () async {
+                            final TimeOfDay? pickedTime = await showTimePicker(
+                              context: context,
+                              initialTime: _newEventEndTime,
+                            );
+                            if (pickedTime != null) {
+                              setState(() {
+                                _newEventEndTime = pickedTime;
+                                _endTimeController.text = pickedTime.format(context);
+                              });
+                            }
+                          },
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _locationController,
-                      decoration: const InputDecoration(
-                        labelText: 'Location (optional)',
-                        border: OutlineInputBorder(),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _locationController,
+                    decoration: const InputDecoration(
+                      labelText: 'Location (optional)',
+                      border: OutlineInputBorder(),
                     ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _descriptionController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Description (optional)',
-                        border: OutlineInputBorder(),
-                      ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _descriptionController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Description (optional)',
+                      border: OutlineInputBorder(),
                     ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _linkController,
-                      decoration: const InputDecoration(
-                        labelText: 'Link (optional)',
-                        hintText: 'https://example.com',
-                        border: OutlineInputBorder(),
-                      ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _linkController,
+                    decoration: const InputDecoration(
+                      labelText: 'Link (optional)',
+                      hintText: 'https://example.com',
+                      border: OutlineInputBorder(),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (_titleController.text.isNotEmpty) {
-                      // Create new event
-                      final newEvent = {
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () async {
+                  if (_titleController.text.isNotEmpty && _currentUser != null) {
+                    try {
+                      final DateTime composedDateTime = DateTime(
+                        _newEventDate.year,
+                        _newEventDate.month,
+                        _newEventDate.day,
+                        _newEventStartTime.hour,
+                        _newEventStartTime.minute,
+                      );
+
+                      // Save date as Firestore Timestamp to avoid parsing issues later.
+                      await _firestore.collection('events').add({
                         'title': _titleController.text,
                         'startTime': _startTimeController.text,
-                        'endTime': _endTimeController.text,
+                        'endTime': _endTimeController.text, // prefer 'endTime'
+                        'emTime': _endTimeController.text, // keep emTime for compatibility
                         'location': _locationController.text,
                         'description': _descriptionController.text,
                         'link': _linkController.text,
-                        'date': DateTime(
-                          _newEventDate.year,
-                          _newEventDate.month,
-                          _newEventDate.day,
-                          _newEventStartTime.hour,
-                          _newEventStartTime.minute,
-                        ),
-                      };
-
-                      // Add to events list
-                      setState(() {
-                        _events.add(newEvent);
-                        // Sort events by time
-                        _events.sort((a, b) => (a['date'] as DateTime)
-                            .compareTo(b['date'] as DateTime));
+                        'date': Timestamp.fromDate(composedDateTime), // store as Timestamp
+                        'userId': _currentUser!.uid,
                       });
 
+                      if (!mounted) return;
                       Navigator.pop(context);
+                    } catch (e) {
+                      debugPrint('Error adding event: $e');
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to add event')));
                     }
-                  },
-                  child: const Text('Add Event'),
-                ),
-              ],
-            );
-          },
-        );
+                  } else {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Title required & must be logged in')));
+                  }
+                },
+                child: const Text('Add Event'),
+              ),
+            ],
+          );
+        });
       },
     );
+  }
+
+  Future<void> _deleteEvent(String eventId) async {
+    try {
+      await _firestore.collection('events').doc(eventId).delete();
+    } catch (e) {
+      debugPrint('Error deleting event: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to delete event')));
+    }
   }
 
   String _getDayAbbreviation(DateTime date) {
@@ -429,25 +550,23 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
   bool _isToday(DateTime date) {
     final now = DateTime.now();
-    return date.day == now.day &&
-        date.month == now.month &&
-        date.year == now.year;
+    return date.day == now.day && date.month == now.month && date.year == now.year;
   }
 
   bool _hasEvents(DateTime date) {
     return _events.any((event) {
       final eventDate = event['date'] as DateTime;
-      return eventDate.day == date.day &&
-          eventDate.month == date.month &&
-          eventDate.year == date.year;
+      return eventDate.day == date.day && eventDate.month == date.month && eventDate.year == date.year;
     });
   }
 
   Future<void> _launchUrl(String url) async {
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
     } else {
-      throw 'Could not launch $url';
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not launch $url')));
     }
   }
 
@@ -458,14 +577,11 @@ class _TimelineScreenState extends State<TimelineScreen> {
     // Get events for selected date and sort by time
     final eventsForSelectedDate = _events.where((event) {
       final eventDate = event['date'] as DateTime;
-      return eventDate.day == _selectedDate!.day &&
-          eventDate.month == _selectedDate!.month &&
-          eventDate.year == _selectedDate!.year;
+      return eventDate.day == _selectedDate!.day && eventDate.month == _selectedDate!.month && eventDate.year == _selectedDate!.year;
     }).toList();
 
-    // Sort events by time
-    eventsForSelectedDate.sort(
-        (a, b) => (a['date'] as DateTime).compareTo(b['date'] as DateTime));
+    // Sort events by time (date contains time too)
+    eventsForSelectedDate.sort((a, b) => (a['date'] as DateTime).compareTo(b['date'] as DateTime));
 
     return Scaffold(
       body: Column(
@@ -473,8 +589,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
         children: [
           // Welcome section
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
               children: [
                 // Avatar
@@ -484,26 +599,18 @@ class _TimelineScreenState extends State<TimelineScreen> {
                   child: const Icon(Icons.person, size: 40, color: Colors.grey),
                 ),
                 const SizedBox(width: 12),
-                // Welcome text
+                // Welcome text - you may want to replace with actual user data later
                 const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Welcome to TNB,',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
+                    Text('Welcome to TNB,', style: TextStyle(fontSize: 16, color: Colors.grey)),
                     SizedBox(height: 4),
-                    Text(
-                      'Siti Zubaidah',
-                      style:
-                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
+                    Text('Siti Zubaidah', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ],
             ),
           ),
-
           const SizedBox(height: 16),
 
           // Month and year navigation
@@ -512,24 +619,9 @@ class _TimelineScreenState extends State<TimelineScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_ios),
-                  onPressed: _goToPreviousMonth,
-                ),
-                GestureDetector(
-                  onTap: _showMonthYearPicker,
-                  child: Text(
-                    DateFormat('MMMM yyyy').format(_currentDate),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.arrow_forward_ios),
-                  onPressed: _goToNextMonth,
-                ),
+                IconButton(icon: const Icon(Icons.arrow_back_ios), onPressed: _goToPreviousMonth),
+                GestureDetector(onTap: _showMonthYearPicker, child: Text(DateFormat('MMMM yyyy').format(_currentDate), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                IconButton(icon: const Icon(Icons.arrow_forward_ios), onPressed: _goToNextMonth),
               ],
             ),
           ),
@@ -548,13 +640,11 @@ class _TimelineScreenState extends State<TimelineScreen> {
                 final day = _visibleDays[index];
                 final isToday = _isToday(day);
                 final hasEvents = _hasEvents(day);
-                final isSelected = _selectedDate != null &&
-                    day.day == _selectedDate!.day &&
-                    day.month == _selectedDate!.month &&
-                    day.year == _selectedDate!.year;
+                final isSelected = _selectedDate != null && day.day == _selectedDate!.day && day.month == _selectedDate!.month && day.year == _selectedDate!.year;
 
                 return GestureDetector(
                   onTap: () {
+                    if (!mounted) return;
                     setState(() {
                       _selectedDate = day;
                     });
@@ -563,46 +653,18 @@ class _TimelineScreenState extends State<TimelineScreen> {
                     width: 70,
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     decoration: BoxDecoration(
-                      color: isSelected
-                          ? Colors.blue
-                          : isToday
-                              ? Colors.blue.withOpacity(0.1)
-                              : Colors.transparent,
+                      color: isSelected ? Colors.blue : (isToday ? Colors.blue.withOpacity(0.1) : Colors.transparent),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isToday ? Colors.blue : Colors.transparent,
-                        width: 1,
-                      ),
+                      border: Border.all(color: isToday ? Colors.blue : Colors.transparent, width: 1),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          _getDayAbbreviation(day),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isSelected ? Colors.white : Colors.grey,
-                          ),
-                        ),
+                        Text(_getDayAbbreviation(day), style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : Colors.grey)),
                         const SizedBox(height: 4),
-                        Text(
-                          '${day.day}',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? Colors.white : Colors.black,
-                          ),
-                        ),
+                        Text('${day.day}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : Colors.black)),
                         if (hasEvents)
-                          Container(
-                            width: 6,
-                            height: 6,
-                            margin: const EdgeInsets.only(top: 4),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
+                          Container(width: 6, height: 6, margin: const EdgeInsets.only(top: 4), decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
                       ],
                     ),
                   ),
@@ -614,50 +676,53 @@ class _TimelineScreenState extends State<TimelineScreen> {
           // Selected date
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  formattedDate,
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                if (_isToday(_selectedDate!))
-                  Text(
-                    'Today',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.blue[700],
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-              ],
-            ),
+            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Text(formattedDate, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              if (_isToday(_selectedDate!))
+                Text('Today', style: TextStyle(fontSize: 14, color: Colors.blue[700], fontWeight: FontWeight.bold)),
+            ]),
           ),
 
           // Events list (Timeline)
           Expanded(
-            child: ListView.builder(
-              itemCount: eventsForSelectedDate.length,
-              itemBuilder: (context, index) {
-                final event = eventsForSelectedDate[index];
-                final eventDate = event['date'] as DateTime;
+            child: _events.isEmpty
+                ? const Center(child: Text('No events found'))
+                : eventsForSelectedDate.isEmpty
+                    ? Center(child: Text('No events on $formattedDate'))
+                    : ListView.builder(
+                        itemCount: eventsForSelectedDate.length,
+                        itemBuilder: (context, index) {
+                          final event = eventsForSelectedDate[index];
+                          final eventDate = event['date'] as DateTime;
 
-                return TimelineEventItem(
-                  title: event['title'],
-                  startTime: event['startTime'],
-                  endTime: event['endTime'],
-                  location: event['location'],
-                  description: event['description'],
-                  link: event['link'],
-                  onLinkTap: (link) {
-                    if (link.isNotEmpty) {
-                      _launchUrl(link);
-                    }
-                  },
-                );
-              },
-            ),
+                          return Dismissible(
+                            key: Key(event['id']),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              color: Colors.red,
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              child: const Icon(Icons.delete, color: Colors.white),
+                            ),
+                            onDismissed: (direction) {
+                              _deleteEvent(event['id']);
+                            },
+                            child: TimelineEventItem(
+                              title: event['title'],
+                              startTime: event['startTime'],
+                              endTime: event['endTime'],
+                              location: event['location'],
+                              description: event['description'],
+                              link: event['link'],
+                              onLinkTap: (link) {
+                                if (link.isNotEmpty) {
+                                  _launchUrl(link);
+                                }
+                              },
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
@@ -698,94 +763,36 @@ class TimelineEventItem extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.2), spreadRadius: 1, blurRadius: 3, offset: const Offset(0, 1))],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Time indicator
-          Container(
-            width: 80,
-            padding: const EdgeInsets.only(right: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  startTime,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
-                  ),
-                ),
-                Text(
-                  endTime,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (location.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    location,
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-                if (description.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-                if (link.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () => onLinkTap(link),
-                    child: Text(
-                      link,
-                      style: const TextStyle(
-                        color: Colors.blue,
-                        fontSize: 14,
-                        decoration: TextDecoration.underline,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Time indicator
+        Container(
+          width: 80,
+          padding: const EdgeInsets.only(right: 12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(startTime, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue)),
+            Text(endTime, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+          ]),
+        ),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            if (location.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(location, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+            ],
+            if (description.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(description, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+            ],
+            if (link.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              GestureDetector(onTap: () => onLinkTap(link), child: Text(link, style: const TextStyle(color: Colors.blue, fontSize: 14, decoration: TextDecoration.underline), overflow: TextOverflow.ellipsis)),
+            ],
+          ]),
+        ),
+      ]),
     );
   }
 }

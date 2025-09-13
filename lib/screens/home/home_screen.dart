@@ -1,10 +1,14 @@
+// lib/screens/home/home_screen.dart
+
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:onboarding_app/screens/auth/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:onboarding_app/screens/myjourney/my_journey_screen.dart';
+import 'package:onboarding_app/screens/learninghub/learning_hub_screen.dart';
+import 'package:onboarding_app/screens/myjourney/appbar_my_journey.dart';
+import 'package:onboarding_app/screens/myjourney/timeline_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -406,7 +410,61 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildSmallActionCompact(Widget icon, String label, Color color) {
     return GestureDetector(
       onTap: () {
-        // TODO: handle navigation
+        if (label == "Learning\nHub") {
+          // *** Change this line to navigate to DocumentUploadScreen1 ***
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const LearningHubScreen(), // <-- Corrected screen
+            ),
+          );
+        }
+        if (label == "Facilities\n") {
+          // *** Change this line to navigate to DocumentUploadScreen1 ***
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const TimelineScreen(), // <-- Corrected screen
+            ),
+          );
+        }
+        if (label == "My\nDocument") {
+          // *** Change this line to navigate to DocumentUploadScreen1 ***
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const TimelineScreen(), // <-- Corrected screen
+            ),
+          );
+        }
+        if (label == "Task\nManager") {
+          // *** Change this line to navigate to DocumentUploadScreen1 ***
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const TimelineScreen(), // <-- Corrected screen
+            ),
+          );
+        }
+        if (label == "Meet the\nTeam") {
+          // *** Change this line to navigate to DocumentUploadScreen1 ***
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const TimelineScreen(), // <-- Corrected screen
+            ),
+          );
+        }
+        if (label == "Buddy\nChat") {
+          // *** Change this line to navigate to DocumentUploadScreen1 ***
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const TimelineScreen(), // <-- Corrected screen
+            ),
+          );
+        }
+        // You can add other navigation logic here for other labels if needed
       },
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -429,7 +487,7 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const MyJourneyScreen()),
+          MaterialPageRoute(builder: (context) => const AppBarMyJourney()),
         );
       },
       child: Column(
