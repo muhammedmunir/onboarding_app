@@ -1,5 +1,3 @@
-// lib/screens/home/home_screen.dart
-
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
@@ -23,6 +21,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic>? _userData;
   bool _isCheckingVerification = true;
 
+  // List of screens for each tab
+  final List<Widget> _screens = [
+    const HomeContent(), // Home tab
+    const AppBarMyJourney(), // Profile tab
+    const AppBarMyJourney(), // Settings tab
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -34,15 +39,16 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+  @override
+  void dispose() {
+    // Jika nanti ada subscription / timer, batalkan di sini.
+    super.dispose();
   }
 
-  void _toggleHeaderExpansion() {
+  void _onItemTapped(int index) {
+    if (!mounted) return;
     setState(() {
-      _isHeaderExpanded = !_isHeaderExpanded;
+      _selectedIndex = index;
     });
   }
 
@@ -55,9 +61,10 @@ class _HomeScreenState extends State<HomeScreen> {
             .doc(user.uid)
             .get();
 
+        if (!mounted) return; // penting: jangan update state kalau sudah dispose
         if (userDoc.exists) {
           setState(() {
-            _userData = userDoc.data() as Map<String, dynamic>;
+            _userData = userDoc.data() as Map<String, dynamic>?;
           });
         }
       }
@@ -67,23 +74,34 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _checkEmailVerification() async {
-    User? user = FirebaseAuth.instance.currentUser;
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
 
-    if (user != null && !user.emailVerified) {
-      // Email not verified - show verification dialog
-      _showVerificationDialog(context, user);
+      if (user != null && !user.emailVerified) {
+        if (!mounted) return;
+        _showVerificationDialog(context, user);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _isCheckingVerification = false;
+      });
+    } catch (e) {
+      print("Error checking email verification: $e");
+      if (!mounted) return;
+      setState(() {
+        _isCheckingVerification = false;
+      });
     }
-
-    setState(() {
-      _isCheckingVerification = false;
-    });
   }
 
   void _showVerificationDialog(BuildContext context, User user) {
+    if (!mounted) return;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text('Email Not Verified'),
           content: const Text(
@@ -93,7 +111,8 @@ class _HomeScreenState extends State<HomeScreen> {
             TextButton(
               child: const Text('Close'),
               onPressed: () {
-                Navigator.of(context).pop();
+                if (!mounted) return;
+                Navigator.of(dialogContext).pop();
               },
             ),
             TextButton(
@@ -101,14 +120,16 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () async {
                 try {
                   await user.sendEmailVerification();
+                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Verification email sent!'),
                       backgroundColor: Colors.green,
                     ),
                   );
-                  Navigator.of(context).pop();
+                  Navigator.of(dialogContext).pop();
                 } catch (e) {
+                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Error: ${e.toString()}'),
@@ -121,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
             TextButton(
               child: const Text('Logout'),
               onPressed: () async {
-                Navigator.of(context).pop();
+                Navigator.of(dialogContext).pop();
                 await _signOut();
               },
             ),
@@ -134,6 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _signOut() async {
     try {
       await FirebaseAuth.instance.signOut();
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -145,8 +167,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color.fromRGBO(224, 124, 124, 1);
-
     // Show loading indicator while checking verification
     if (_isCheckingVerification) {
       return const Scaffold(
@@ -157,27 +177,117 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header Pengguna dengan kemampuan stretch
-              _buildExpandableUserHeader(primaryColor),
-              const SizedBox(height: 24),
+      body: _screens[_selectedIndex],
+      bottomNavigationBar: _buildBottomNavBar(),
+    );
+  }
 
-              // Bahagian Quick Action
-              _buildQuickActions(primaryColor),
-              const SizedBox(height: 24),
+  // Bottom Navigation Bar
+  Widget _buildBottomNavBar() {
+    return CurvedNavigationBar(
+      backgroundColor: Colors.transparent,
+      color: const Color.fromRGBO(224, 124, 124, 1),
+      buttonBackgroundColor: const Color.fromRGBO(224, 124, 124, 1),
+      height: 60,
+      items: const <Widget>[
+        Icon(Icons.home, size: 30, color: Colors.white),
+        Icon(Icons.person, size: 30, color: Colors.white),
+        Icon(Icons.settings, size: 30, color: Colors.white),
+      ],
+      index: _selectedIndex,
+      onTap: _onItemTapped,
+      letIndexChange: (index) => true,
+    );
+  }
+}
 
-              // Bahagian Berita
-              _buildNewsSection(),
-              const SizedBox(height: 24),
-            ],
-          ),
+// Home Content Widget (extracted from the original HomeScreen)
+class HomeContent extends StatefulWidget {
+  const HomeContent({super.key});
+
+  @override
+  State<HomeContent> createState() => _HomeContentState();
+}
+
+class _HomeContentState extends State<HomeContent> {
+  bool _isHeaderExpanded = false;
+  Map<String, dynamic>? _userData;
+  final Color primaryColor = const Color.fromRGBO(224, 124, 124, 1);
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserData();
+  }
+
+  @override
+  void dispose() {
+    // Jika ada subscription atau timer, batalkan di sini.
+    super.dispose();
+  }
+
+  Future<void> _fetchUserData() async {
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (!mounted) return;
+        if (userDoc.exists) {
+          setState(() {
+            _userData = userDoc.data() as Map<String, dynamic>?;
+          });
+        }
+      }
+    } catch (e) {
+      print("Error fetching user data: $e");
+    }
+  }
+
+  Future<void> _signOut() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    } catch (e) {
+      print("Error signing out: $e");
+    }
+  }
+
+  void _toggleHeaderExpansion() {
+    if (!mounted) return;
+    setState(() {
+      _isHeaderExpanded = !_isHeaderExpanded;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header Pengguna dengan kemampuan stretch
+            _buildExpandableUserHeader(primaryColor),
+            const SizedBox(height: 24),
+
+            // Bahagian Quick Action
+            _buildQuickActions(primaryColor),
+            const SizedBox(height: 24),
+
+            // Bahagian Berita
+            _buildNewsSection(),
+            const SizedBox(height: 24),
+          ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNavBar(primaryColor),
     );
   }
 
@@ -411,60 +521,53 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: () {
         if (label == "Learning\nHub") {
-          // *** Change this line to navigate to DocumentUploadScreen1 ***
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const LearningHubScreen(), // <-- Corrected screen
+              builder: (context) => const LearningHubScreen(),
             ),
           );
         }
         if (label == "Facilities\n") {
-          // *** Change this line to navigate to DocumentUploadScreen1 ***
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const TimelineScreen(), // <-- Corrected screen
+              builder: (context) => const TimelineScreen(),
             ),
           );
         }
         if (label == "My\nDocument") {
-          // *** Change this line to navigate to DocumentUploadScreen1 ***
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const TimelineScreen(), // <-- Corrected screen
+              builder: (context) => const TimelineScreen(),
             ),
           );
         }
         if (label == "Task\nManager") {
-          // *** Change this line to navigate to DocumentUploadScreen1 ***
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const TimelineScreen(), // <-- Corrected screen
+              builder: (context) => const TimelineScreen(),
             ),
           );
         }
         if (label == "Meet the\nTeam") {
-          // *** Change this line to navigate to DocumentUploadScreen1 ***
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const TimelineScreen(), // <-- Corrected screen
+              builder: (context) => const TimelineScreen(),
             ),
           );
         }
         if (label == "Buddy\nChat") {
-          // *** Change this line to navigate to DocumentUploadScreen1 ***
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const TimelineScreen(), // <-- Corrected screen
+              builder: (context) => const TimelineScreen(),
             ),
           );
         }
-        // You can add other navigation logic here for other labels if needed
       },
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -580,7 +683,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(15),
                   image: const DecorationImage(
-                    image: AssetImage("assets/images/news_background.jpg"),
+                    image: AssetImage("assets/images/background_news.jpeg"),
                     fit: BoxFit.cover,
                   ),
                 ),
@@ -616,24 +719,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  // Bottom Navigation Bar
-  Widget _buildBottomNavBar(Color primaryColor) {
-    return CurvedNavigationBar(
-      backgroundColor: Colors.transparent,
-      color: const Color.fromRGBO(224, 124, 124, 1),
-      buttonBackgroundColor: primaryColor,
-      height: 60,
-      items: const <Widget>[
-        Icon(Icons.home, size: 30, color: Colors.white),
-        Icon(Icons.person, size: 30, color: Colors.white),
-        Icon(Icons.settings, size: 30, color: Colors.white),
-      ],
-      index: _selectedIndex,
-      onTap: _onItemTapped,
-      letIndexChange: (index) => true,
     );
   }
 }

@@ -1,3 +1,4 @@
+// checklist.screen.dart (patched)
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -53,19 +54,24 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
             .where('userId', isEqualTo: user.uid)
             .get();
 
+        if (!mounted) return; // <<< safety check
         setState(() {
           _projects = querySnapshot.docs.map((doc) {
             final data = doc.data();
+            // defensive access in case fields missing
+            Timestamp? s = data['startDate'] is Timestamp ? data['startDate'] as Timestamp : null;
+            Timestamp? e = data['endDate'] is Timestamp ? data['endDate'] as Timestamp : null;
             return {
               'id': doc.id,
-              'title': data['title'],
-              'startDate': (data['startDate'] as Timestamp).toDate(),
-              'endDate': (data['endDate'] as Timestamp).toDate(),
+              'title': data['title'] ?? '',
+              'startDate': s?.toDate() ?? DateTime.now(),
+              'endDate': e?.toDate() ?? DateTime.now().add(const Duration(days: 7)),
             };
           }).toList();
         });
       }
     } catch (e) {
+      // avoid calling setState inside catch without mounted
       print('Error loading projects: $e');
     }
   }
@@ -79,16 +85,18 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
             .where('userId', isEqualTo: user.uid)
             .get();
 
+        if (!mounted) return; // <<< safety check
         setState(() {
           _tasks = querySnapshot.docs.map((doc) {
             final data = doc.data();
+            Timestamp? d = data['dueDate'] is Timestamp ? data['dueDate'] as Timestamp : null;
             return {
               'id': doc.id,
               'projectId': data['projectId'],
-              'title': data['title'],
-              'description': data['description'],
-              'dueDate': (data['dueDate'] as Timestamp).toDate(),
-              'completed': data['completed'],
+              'title': data['title'] ?? '',
+              'description': data['description'] ?? '',
+              'dueDate': d?.toDate() ?? DateTime.now().add(const Duration(days: 1)),
+              'completed': data['completed'] ?? false,
             };
           }).toList();
         });
@@ -109,7 +117,9 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
           'userId': user.uid,
           'createdAt': Timestamp.now(),
         });
-        _loadProjects(); // Reload projects after adding
+        // reload after add
+        if (!mounted) return;
+        await _loadProjects();
       }
     } catch (e) {
       print('Error adding project: $e');
@@ -129,7 +139,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
           'userId': user.uid,
           'createdAt': Timestamp.now(),
         });
-        _loadTasks(); // Reload tasks after adding
+        if (!mounted) return;
+        await _loadTasks();
       }
     } catch (e) {
       print('Error adding task: $e');
@@ -139,7 +150,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   Future<void> _updateTask(String taskId, Map<String, dynamic> updates) async {
     try {
       await _firestore.collection('tasks').doc(taskId).update(updates);
-      _loadTasks(); // Reload tasks after updating
+      if (!mounted) return;
+      await _loadTasks();
     } catch (e) {
       print('Error updating task: $e');
     }
@@ -148,7 +160,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   Future<void> _deleteTask(String taskId) async {
     try {
       await _firestore.collection('tasks').doc(taskId).delete();
-      _loadTasks(); // Reload tasks after deleting
+      if (!mounted) return;
+      await _loadTasks();
     } catch (e) {
       print('Error deleting task: $e');
     }
@@ -169,14 +182,17 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
       // Then delete the project
       await _firestore.collection('projects').doc(projectId).delete();
       
-      _loadProjects(); // Reload projects after deleting
-      _loadTasks(); // Reload tasks after deleting
+      if (!mounted) return;
+      await _loadProjects(); // Reload projects after deleting
+      if (!mounted) return;
+      await _loadTasks(); // Reload tasks after deleting
     } catch (e) {
       print('Error deleting project: $e');
     }
   }
 
   void _showAddOptionsDialog() {
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -214,6 +230,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     _projectStartDate = DateTime.now();
     _projectEndDate = DateTime.now().add(const Duration(days: 7));
 
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -336,6 +353,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
 
   void _showAddTaskDialog() {
     if (_projects.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please create a project first'),
@@ -350,6 +368,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     _taskDescriptionController.clear();
     _taskDueDate = DateTime.now().add(const Duration(days: 1));
 
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -481,6 +500,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     _taskDueDate = task['dueDate'];
     _selectedProject = _projects.firstWhere((project) => project['id'] == task['projectId']);
 
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -611,6 +631,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   void _confirmDeleteTask(String taskId) {
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -637,6 +658,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   void _confirmDeleteProject(String projectId) {
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -663,12 +685,14 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   void _selectProject(Map<String, dynamic> project) {
+    if (!mounted) return;
     setState(() {
       _selectedProject = project;
     });
   }
 
   void _clearSelection() {
+    if (!mounted) return;
     setState(() {
       _selectedProject = null;
     });
@@ -695,6 +719,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   void _toggleTaskCompletion(Map<String, dynamic> task) {
+    // no direct setState here: update via backend and reload tasks
     _updateTask(task['id'], {
       'completed': !task['completed'],
     });
@@ -847,7 +872,6 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                                         ? Colors.green 
                                         : const Color(0xFFE07C7C),
                                     ),
-                                    borderRadius: BorderRadius.circular(4),
                                     minHeight: 6,
                                   ),
                                   const SizedBox(height: 4),
@@ -1060,6 +1084,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
       ),
       confirmDismiss: (direction) async {
         // Show confirmation dialog before deleting
+        if (!mounted) return false;
         return await showDialog(
           context: context,
           builder: (BuildContext context) {
@@ -1125,9 +1150,6 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
-                      decoration: task['completed'] 
-                          ? null 
-                          : null,
                       color: task['completed'] 
                           ? Colors.grey 
                           : Colors.black,
@@ -1141,9 +1163,6 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey[600],
-                          decoration: task['completed'] 
-                              ? null
-                              : null,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1164,9 +1183,6 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                           style: TextStyle(
                             fontSize: 12,
                             color: task['completed'] ? Colors.grey : const Color(0xFFE07C7C),
-                            decoration: task['completed'] 
-                                ? null
-                                : null,
                           ),
                         ),
                       ],
