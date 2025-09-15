@@ -21,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final AuthService _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
 
+  // --- Perhatian: periksa mounted selepas await sebelum guna context / setState ---
   void _login() async {
     // Validate form
     if (!_formKey.currentState!.validate()) {
@@ -38,6 +39,9 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text,
       );
 
+      // Pastikan widget masih mounted selepas await
+      if (!mounted) return;
+
       if (user != null) {
         // Check if email is verified
         if (user.emailVerified) {
@@ -47,10 +51,11 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         } else {
           // Email not verified - show verification dialog
-          _showVerificationDialog(context, user);
+          _showVerificationDialog(user);
         }
       } else {
         // Login failed
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Login failed. Please check your credentials.'),
@@ -59,6 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       String errorMessage = 'Login failed. Please try again.';
       
       if (e.code == 'user-not-found') {
@@ -78,6 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: ${e.toString()}'),
@@ -85,17 +92,20 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     } finally {
+      // Pastikan widget masih mounted sebelum setState
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
     }
   }
 
-  void _showVerificationDialog(BuildContext context, User user) {
+  // Ubah signature supaya tidak ambil BuildContext (guna mounted check)
+  void _showVerificationDialog(User user) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text('Email Not Verified'),
           content: const Text(
@@ -105,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
             TextButton(
               child: const Text('OK'),
               onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(dialogContext).pop();
               },
             ),
             TextButton(
@@ -113,14 +123,18 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: () async {
                 try {
                   await user.sendEmailVerification();
+                  // Pastikan StatefulWidget masih mounted sebelum gunakan context
+                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Verification email sent!'),
                       backgroundColor: Colors.green,
                     ),
                   );
-                  Navigator.of(context).pop();
+                  // Tutup dialog (gunakan dialogContext yang builder bagi)
+                  Navigator.of(dialogContext).pop();
                 } catch (e) {
+                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Error: ${e.toString()}'),
@@ -134,6 +148,14 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       },
     );
+  }
+
+  @override
+  void dispose() {
+    // buang controller untuk elak memory leak
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
