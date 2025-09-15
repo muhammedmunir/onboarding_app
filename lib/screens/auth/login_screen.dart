@@ -4,6 +4,10 @@ import 'package:onboarding_app/screens/auth/forget_password_screen.dart';
 import 'package:onboarding_app/screens/auth/register_screen.dart';
 import 'package:onboarding_app/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'package:onboarding_app/providers/local_auth_provider.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,11 +21,128 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
-  
+  static const String _kLoginStatusKey = 'loginStatus';
+  bool _showBiometricButton = false;
+
   final AuthService _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
 
-  // --- Perhatian: periksa mounted selepas await sebelum guna context / setState ---
+  // secure storage untuk simpan credentials
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  static const String _kBiometricEnabledKey = 'biometric_enabled';
+  static const String _kSavedEmailKey = 'saved_email';
+  static const String _kSavedPasswordKey = 'saved_password';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _evaluateBiometricAvailability();
+      await _tryAutoBiometricLogin();
+    });
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _evaluateBiometricAvailability() async {
+    try {
+      final localAuthProv = Provider.of<LocalAuthenticationProvider>(context, listen: false);
+      final prefs = await SharedPreferences.getInstance();
+      final canCheck = await localAuthProv.checkBiometricAvailability();
+      final bioEnabled = prefs.getBool(_kBiometricEnabledKey) ?? false;
+      final savedEmail = await _secureStorage.read(key: _kSavedEmailKey) ?? '';
+      final savedPassword = await _secureStorage.read(key: _kSavedPasswordKey) ?? '';
+
+      setState(() {
+        _showBiometricButton = canCheck && bioEnabled && savedEmail.isNotEmpty && savedPassword.isNotEmpty;
+      });
+    } catch (e) {
+      // if something fails, just hide biometric button
+      setState(() {
+        _showBiometricButton = false;
+      });
+    }
+  }
+
+  Future<void> _tryAutoBiometricLogin() async {
+    final localAuthProv =
+        Provider.of<LocalAuthenticationProvider>(context, listen: false);
+    final prefs = await SharedPreferences.getInstance();
+
+    final bool bioEnabled = prefs.getBool(_kBiometricEnabledKey) ?? false;
+    if (!bioEnabled) return;
+
+    final canCheck = await localAuthProv.checkBiometricAvailability();
+    if (!canCheck) return;
+
+    // Baca credentials dari secure storage
+    String savedEmail = '';
+    String savedPassword = '';
+    try {
+      savedEmail = await _secureStorage.read(key: _kSavedEmailKey) ?? '';
+      savedPassword = await _secureStorage.read(key: _kSavedPasswordKey) ?? '';
+    } catch (e) {
+      // ignore read error, fallback
+    }
+
+    if (savedEmail.isNotEmpty && savedPassword.isNotEmpty) {
+      final bool authOK = await localAuthProv.authenticateWithBiometrics(
+        localizedReason: 'Authenticate to sign in with saved credentials',
+      );
+      if (authOK) {
+        setState(() {
+          _isLoading = true;
+        });
+        try {
+          User? user =
+              await _authService.signInWithEmail(savedEmail, savedPassword);
+          if (user != null) {
+            if (user.emailVerified) {
+              // CHANGED: set loginStatus only after successful login
+              await prefs.setBool(_kLoginStatusKey, true);
+
+              if (mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const HomeScreen()),
+                );
+              }
+            } else {
+              // jika belum verify, paparkan dialog sama seperti normal flow
+              if (mounted) _showVerificationDialog(context, user);
+            }
+          } else {
+            // gagal login — beri notifikasi
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Auto biometric login failed.'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Auto login error: ${e.toString()}')),
+            );
+          }
+        } finally {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+          }
+        }
+      }
+    }
+  }
+
   void _login() async {
     // Validate form
     if (!_formKey.currentState!.validate()) {
@@ -35,27 +156,33 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       // Call AuthService to login with email and password
       User? user = await _authService.signInWithEmail(
-        _emailController.text,
+        _emailController.text.trim(),
         _passwordController.text,
       );
-
-      // Pastikan widget masih mounted selepas await
-      if (!mounted) return;
 
       if (user != null) {
         // Check if email is verified
         if (user.emailVerified) {
+          // selepas berjaya login, tanya user nak enable biometric?
+          await _offerEnableBiometricIfAvailable(
+              _emailController.text.trim(), _passwordController.text);
+
+          // CHANGED: set loginStatus only after successful login
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool(_kLoginStatusKey, true);
+
           // Login successful and email verified - navigate to home screen
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
-          );
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+            );
+          }
         } else {
           // Email not verified - show verification dialog
-          _showVerificationDialog(user);
+          _showVerificationDialog(context, user);
         }
       } else {
         // Login failed
-        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Login failed. Please check your credentials.'),
@@ -64,9 +191,8 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
       String errorMessage = 'Login failed. Please try again.';
-      
+
       if (e.code == 'user-not-found') {
         errorMessage = 'No user found with this email.';
       } else if (e.code == 'wrong-password') {
@@ -76,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen> {
       } else if (e.code == 'user-disabled') {
         errorMessage = 'This account has been disabled.';
       }
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(errorMessage),
@@ -84,7 +210,6 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     } catch (e) {
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: ${e.toString()}'),
@@ -92,30 +217,209 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     } finally {
-      // Pastikan widget masih mounted sebelum setState
-      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
+      // re-evaluate biometric button (in case user just enabled biometric)
+      await _evaluateBiometricAvailability();
     }
   }
 
-  // Ubah signature supaya tidak ambil BuildContext (guna mounted check)
-  void _showVerificationDialog(User user) {
+  Future<void> _offerEnableBiometricIfAvailable(
+      String email, String password) async {
+    final localAuthProv =
+        Provider.of<LocalAuthenticationProvider>(context, listen: false);
+    final prefs = await SharedPreferences.getInstance();
+
+    final bool canCheck = await localAuthProv.checkBiometricAvailability();
+    final bool alreadyEnabled = prefs.getBool(_kBiometricEnabledKey) ?? false;
+
+    if (!canCheck || alreadyEnabled) return;
+
+    // Tawarkan dialog untuk aktifkan biometric — ini TIDAK ubah UI utama (pop-up sahaja)
+    if (!mounted) return;
+    final enable = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          title: const Text('Enable Biometric Login?'),
+          content: const Text(
+              'Do you want to enable biometric login for faster sign-in next time?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('No'),
+              onPressed: () => Navigator.of(ctx).pop(false),
+            ),
+            TextButton(
+              child: const Text('Yes'),
+              onPressed: () => Navigator.of(ctx).pop(true),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (enable == true) {
+      // cuba authenticate dulu untuk confirm identity sebelum simpan
+      final authOK = await localAuthProv.authenticateWithBiometrics(
+        localizedReason: 'Confirm to enable biometric login',
+      );
+      if (authOK) {
+        // simpan email/password ke secure storage
+        await _secureStorage.write(key: _kSavedEmailKey, value: email);
+        await _secureStorage.write(key: _kSavedPasswordKey, value: password);
+        await prefs.setBool(_kBiometricEnabledKey, true);
+
+        // CHANGED: update show button immediately
+        setState(() {
+          _showBiometricButton = true;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Biometric login enabled.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content:
+                  Text('Could not enable biometric. Authentication failed.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _fingerPrintLogin() async {
+    final localAuthProv =
+        Provider.of<LocalAuthenticationProvider>(context, listen: false);
+    final prefs = await SharedPreferences.getInstance();
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final bool bioEnabled = prefs.getBool(_kBiometricEnabledKey) ?? false;
+      final bool canCheck = await localAuthProv.checkBiometricAvailability();
+
+      if (!bioEnabled || !canCheck) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Biometric not available or not enabled.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      final bool authOK = await localAuthProv.authenticateWithBiometrics(
+        localizedReason: 'Authenticate to sign in',
+      );
+
+      if (!authOK) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Biometric authentication failed.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // baca credentials dari secure storage
+      String savedEmail = '';
+      String savedPassword = '';
+      try {
+        savedEmail = await _secureStorage.read(key: _kSavedEmailKey) ?? '';
+        savedPassword = await _secureStorage.read(key: _kSavedPasswordKey) ?? '';
+      } catch (e) {
+        // ignore read error
+      }
+
+      if (savedEmail.isEmpty || savedPassword.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No saved credentials found for biometric login.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // cuba sign-in dengan credentials tersimpan
+      User? user =
+          await _authService.signInWithEmail(savedEmail, savedPassword);
+      if (user != null) {
+        if (user.emailVerified) {
+          // CHANGED: set loginStatus only after successful login
+          await prefs.setBool(_kLoginStatusKey, true);
+
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+            );
+          }
+        } else {
+          if (mounted) _showVerificationDialog(context, user);
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Biometric login failed.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _showVerificationDialog(BuildContext context, User user) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
+      builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Email Not Verified'),
-          content: const Text(
-              'Please verify your email address before logging in. '
-              'Check your inbox for a verification email.'),
+          content:
+              const Text('Please verify your email address before logging in. '
+                  'Check your inbox for a verification email.'),
           actions: <Widget>[
             TextButton(
               child: const Text('OK'),
               onPressed: () {
-                Navigator.of(dialogContext).pop();
+                Navigator.of(context).pop();
               },
             ),
             TextButton(
@@ -123,18 +427,14 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: () async {
                 try {
                   await user.sendEmailVerification();
-                  // Pastikan StatefulWidget masih mounted sebelum gunakan context
-                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Verification email sent!'),
                       backgroundColor: Colors.green,
                     ),
                   );
-                  // Tutup dialog (gunakan dialogContext yang builder bagi)
-                  Navigator.of(dialogContext).pop();
+                  Navigator.of(context).pop();
                 } catch (e) {
-                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Error: ${e.toString()}'),
@@ -148,14 +448,6 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       },
     );
-  }
-
-  @override
-  void dispose() {
-    // buang controller untuk elak memory leak
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
   }
 
   @override
@@ -265,7 +557,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     if (value == null || value.isEmpty) {
                                       return 'Please enter your email';
                                     }
-                                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                    if (!RegExp(
+                                            r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                        .hasMatch(value)) {
                                       return 'Please enter a valid email';
                                     }
                                     return null;
@@ -335,25 +629,68 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 const SizedBox(height: 20),
 
-                                // Button Login
+                                // Button Login + Biometric di sebelah
                                 _isLoading
-                                    ? const Center(child: CircularProgressIndicator())
-                                    : ElevatedButton(
-                                        onPressed: _login,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color.fromRGBO(224, 124, 124, 1),
-                                          padding: const EdgeInsets.symmetric(vertical: 16),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(30),
+                                    ? const Center(
+                                        child: CircularProgressIndicator())
+                                    : Row(
+                                        children: [
+                                          Expanded(
+                                            flex: 5,
+                                            child: ElevatedButton(
+                                              onPressed: _login,
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    const Color.fromRGBO(
+                                                        224, 124, 124, 1),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        vertical: 16),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(30),
+                                                ),
+                                              ),
+                                              child: const Text(
+                                                "Login",
+                                                style: TextStyle(
+                                                    fontSize: 18,
+                                                    color: Colors.white),
+                                              ),
+                                            ),
                                           ),
-                                        ),
-                                        child: const Text(
-                                          "Login",
-                                          style: TextStyle(
-                                              fontSize: 18, color: Colors.white),
-                                        ),
+                                          const SizedBox(width: 12),
+                                          // Biometric button - hanya ditunjuk bila sesuai
+                                          _showBiometricButton
+                                              ? Container(
+                                                  width: 56,
+                                                  height: 48,
+                                                  child: ElevatedButton(
+                                                    onPressed: _fingerPrintLogin,
+                                                    style:
+                                                        ElevatedButton.styleFrom(
+                                                      backgroundColor:
+                                                          const Color.fromRGBO(
+                                                              224, 124, 124, 1),
+                                                      padding: EdgeInsets.zero,
+                                                      shape:
+                                                          RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(12),
+                                                      ),
+                                                      elevation: 4,
+                                                    ),
+                                                    child: const Icon(
+                                                      Icons.fingerprint,
+                                                      size: 26,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                )
+                                              : const SizedBox(width: 0),
+                                        ],
                                       ),
-                                const SizedBox(height: 20),
 
                                 // Register link
                                 Row(
@@ -378,7 +715,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                       child: const Text(
                                         "Register Now",
                                         style: TextStyle(
-                                          color: Color.fromRGBO(224, 124, 124, 1),
+                                          color:
+                                              Color.fromRGBO(224, 124, 124, 1),
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),

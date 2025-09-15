@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:onboarding_app/firebase_options.dart';
 import 'package:onboarding_app/screens/auth/login_screen.dart';
 import 'package:onboarding_app/screens/home/home_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:onboarding_app/providers/local_auth_provider.dart'; // sesuaikan path jika perlu
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,18 +24,21 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'OnboardX TNB',
-      theme: ThemeData(
-        primarySwatch: Colors.red,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        textTheme: GoogleFonts.poppinsTextTheme(
-          Theme.of(context).textTheme,
+    return ChangeNotifierProvider(
+      create: (_) => LocalAuthenticationProvider(),
+      child: MaterialApp(
+        title: 'OnboardX TNB',
+        theme: ThemeData(
+          primarySwatch: Colors.red,
+          visualDensity: VisualDensity.adaptivePlatformDensity,
+          textTheme: GoogleFonts.poppinsTextTheme(
+            Theme.of(context).textTheme,
+          ),
+          scaffoldBackgroundColor: const Color(0xFFF5F5F7),
         ),
-        scaffoldBackgroundColor: const Color(0xFFF5F5F7),
+        debugShowCheckedModeBanner: false,
+        home: const AuthWrapper(),
       ),
-      debugShowCheckedModeBanner: false,
-      home: const AuthWrapper(),
     );
   }
 }
@@ -70,4 +75,4 @@ class AuthWrapper extends StatelessWidget {
       },
     );
   }
-} 
+}
