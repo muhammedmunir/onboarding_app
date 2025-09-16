@@ -43,19 +43,11 @@ class DocumentManagerScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Custom Top Section (mimicking the pink/red bar)
-            Container(
-              height: 50, // Height of the custom bar
-              color: Theme.of(context).colorScheme.primary, // Using primary color for the bar
-            ),
-            const SizedBox(height: 24), // Spacing after the top bar
-
             // Required Documents Section
             Text(
               'Required Documents',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
                   ),
             ),
             const SizedBox(height: 16),
