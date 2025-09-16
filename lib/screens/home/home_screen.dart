@@ -5,8 +5,11 @@ import 'package:onboarding_app/screens/auth/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:onboarding_app/screens/learninghub/learning_hub_screen.dart';
+import 'package:onboarding_app/screens/meettheteam/meet_the_team_screen.dart';
 import 'package:onboarding_app/screens/myjourney/appbar_my_journey.dart';
 import 'package:onboarding_app/screens/myjourney/timeline_screen.dart';
+import 'package:onboarding_app/screens/setting/setting_screen.dart';
+import 'package:onboarding_app/screens/taskmanager/task_manager_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,7 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = [
     const HomeContent(), // Home tab
     const AppBarMyJourney(), // Profile tab
-    const AppBarMyJourney(), // Settings tab
+    const SettingScreen(), // Settings tab
   ];
 
   @override
@@ -548,7 +551,7 @@ class _HomeContentState extends State<HomeContent> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const TimelineScreen(),
+              builder: (context) => const DocumentManagerScreen(),
             ),
           );
         }
@@ -556,7 +559,7 @@ class _HomeContentState extends State<HomeContent> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const TimelineScreen(),
+              builder: (context) => const MeetTheTeamScreen(),
             ),
           );
         }
