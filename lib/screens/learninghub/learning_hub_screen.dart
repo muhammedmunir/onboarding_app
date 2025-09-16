@@ -1,4 +1,3 @@
-// learning_hub_screen.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -16,313 +15,348 @@ class LearningHubScreen extends StatefulWidget {
   State<LearningHubScreen> createState() => _LearningHubScreenState();
 }
 
-class _LearningHubScreenState extends State<LearningHubScreen> {
+class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _shouldRefresh = false;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // App is resumed, refresh data
+      setState(() {
+        _shouldRefresh = true;
+      });
+    }
+  }
+
   void _onSearchChanged() {
-    // trigger rebuild to re-filter results inside StreamBuilder
-    setState(() {});
+    setState(() {
+      _searchQuery = _searchController.text;
+    });
+  }
+
+  Future<void> _refreshData() async {
+    setState(() {
+      _shouldRefresh = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final learningsStream = FirebaseFirestore.instance
-        .collection('learnings')
-        .orderBy('createdAt', descending: true)
-        .snapshots();
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Learning Hub',
-          style: TextStyle(color: Colors.black),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: const Color.fromARGB(0, 255, 255, 255),
-        foregroundColor: Colors.black,
-        automaticallyImplyLeading: false,
-        leading: Center(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () => Navigator.of(context).pop(),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color.fromRGBO(224, 124, 124, 1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.arrow_back_ios_new,
-                color: Colors.white,
-                size: 16,
+    return Focus(
+      onFocusChange: (hasFocus) {
+        if (hasFocus && _shouldRefresh) {
+          _refreshData();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'Learning Hub',
+            style: TextStyle(color: Colors.black),
+          ),
+          centerTitle: true,
+          elevation: 0,
+          backgroundColor: const Color.fromARGB(0, 255, 255, 255),
+          foregroundColor: Colors.black,
+          automaticallyImplyLeading: false,
+          leading: Center(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color.fromRGBO(224, 124, 124, 1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.arrow_back_ios_new,
+                  color: Colors.white,
+                  size: 16,
+                ),
               ),
             ),
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color.fromRGBO(224, 124, 124, 1),
-        foregroundColor: Colors.white,
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const LearningHubCreateScreen()),
-          ).then((newLearning) {
-            if (newLearning != null && newLearning is Map && newLearning['id'] != null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Learning created (id: ${newLearning['id']})')),
-              );
-            }
-          });
-        },
-        child: const Icon(Icons.add),
-      ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: learningsStream,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Error loading learnings: ${snapshot.error}'),
-            );
-          }
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          // Convert documents to normalized map list
-          final docs = snapshot.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-          List<Map<String, dynamic>> allCourses = docs.map((d) {
-            final data = d.data() ?? <String, dynamic>{};
-            final title = (data['title'] as String?) ?? 'Untitled';
-            final description = (data['description'] as String?) ?? '';
-            final imageUrl = (data['coverImageUrl'] as String?) ??
-                'https://cdn-icons-png.flaticon.com/512/888/888883.png';
-            final progressNum = data['progress'];
-            double progress = 0.0;
-            if (progressNum is num) {
-              progress = progressNum.toDouble();
-            } else {
-              try {
-                progress = double.parse((progressNum ?? '0').toString());
-              } catch (_) {
-                progress = 0.0;
+        floatingActionButton: FloatingActionButton(
+          backgroundColor: const Color.fromRGBO(224, 124, 124, 1),
+          foregroundColor: Colors.white,
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const LearningHubCreateScreen()),
+            ).then((newLearning) {
+              if (newLearning != null &&
+                  newLearning is Map &&
+                  newLearning['id'] != null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Learning created (id: ${newLearning['id']})')),
+                );
+                setState(() {
+                  _shouldRefresh = true;
+                });
               }
-            }
-            if (progress < 0) progress = 0.0;
-            if (progress > 1) progress = 1.0;
-
-            String category;
-            if (progress >= 1.0) {
-              category = 'complete';
-            } else if (progress > 0.0) {
-              category = 'inprogress';
-            } else {
-              category = 'notstarted';
-            }
-
-            return {
-              'id': d.id,
-              'title': title,
-              'description': description,
-              'imageUrl': imageUrl,
-              'progress': progress,
-              'category': category,
-              'raw': data,
-            };
-          }).toList();
-
-          // Apply search filter (client side)
-          final query = _searchController.text.trim().toLowerCase();
-          List<Map<String, dynamic>> filtered = allCourses;
-          if (query.isNotEmpty) {
-            filtered = allCourses.where((course) {
-              final title = (course['title'] as String).toLowerCase();
-              final description = (course['description'] as String).toLowerCase();
-              return title.contains(query) || description.contains(query);
-            }).toList();
-          }
-
-          final completeCourses = filtered.where((c) => c['category'] == 'complete').toList();
-          final inProgressCourses = filtered.where((c) => c['category'] == 'inprogress').toList();
-          final allCoursesFiltered = filtered;
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Search Bar
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(12.0),
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      hintText: 'Search Now...',
-                      prefixIcon: Icon(Icons.search, color: Colors.grey),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-                    ),
+            });
+          },
+          child: const Icon(Icons.add),
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
+                    hintText: 'Search Now...',
+                    prefixIcon: Icon(Icons.search, color: Colors.grey),
+                    border: InputBorder.none,
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
                   ),
                 ),
-                const SizedBox(height: 24.0),
-
-                if (completeCourses.isNotEmpty) ...[
-                  _buildSectionHeader('Complete', true, () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const LearningHubCompleteScreen()),
-                    );
-                  }),
-                  const SizedBox(height: 12.0),
-                  ...completeCourses.map((course) => _buildLearningItemFromMap(course)).toList(),
-                  const SizedBox(height: 24.0),
-                ],
-
-                if (inProgressCourses.isNotEmpty) ...[
-                  _buildSectionHeader('In progress', true, () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const LearningHubInprogressScreen()),
-                    );
-                  }),
-                  const SizedBox(height: 12.0),
-                  ...inProgressCourses.map((course) => _buildLearningItemFromMap(course)).toList(),
-                  const SizedBox(height: 24.0),
-                ],
-
-                if (allCoursesFiltered.isNotEmpty) ...[
-                  _buildSectionHeader('All learning', true, () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const LearningHubAllScreen()),
-                    );
-                  }),
-                  const SizedBox(height: 12.0),
-                  ...allCoursesFiltered.map((course) => _buildLearningItemFromMap(course)).toList(),
-                ],
-
-                if (filtered.isEmpty) ...[
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 40.0),
-                      child: Text(
-                        'No courses found',
-                        style: TextStyle(
-                          fontSize: 18.0,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+              ),
             ),
-          );
-        },
+            Expanded(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('learnings')
+                    .orderBy('createdAt', descending: true)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Error loading learnings: ${snapshot.error}'),
+                    );
+                  }
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final docs = snapshot.data?.docs ?? [];
+                  List<Map<String, dynamic>> allCourses = docs.map((d) {
+                    final data = d.data();
+                    return {
+                      'id': d.id,
+                      'title': data['title'] ?? 'Untitled',
+                      'description': data['description'] ?? '',
+                      'imageUrl': data['coverImageUrl'],
+                      'raw': data,
+                    };
+                  }).toList();
+
+                  final query = _searchQuery.trim().toLowerCase();
+                  List<Map<String, dynamic>> filtered = allCourses;
+                  if (query.isNotEmpty) {
+                    filtered = allCourses.where((course) {
+                      final title = course['title'].toLowerCase();
+                      final description = course['description'].toLowerCase();
+                      return title.contains(query) || description.contains(query);
+                    }).toList();
+                  }
+
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user == null) {
+                    final allCoursesFiltered = filtered.map((course) {
+                      return {
+                        ...course,
+                        'progress': 0.0,
+                        'category': 'notstarted',
+                      };
+                    }).toList();
+                    return _buildListUI(context, allCoursesFiltered, [], [], filtered.isEmpty);
+                  } else {
+                    final userProgFutures = filtered.map((course) {
+                      return FirebaseFirestore.instance
+                          .collection('learnings')
+                          .doc(course['id'])
+                          .collection('userProgress')
+                          .doc(user.uid)
+                          .get();
+                    }).toList();
+
+                    return FutureBuilder<List<DocumentSnapshot<Map<String, dynamic>>>>(
+                      future: Future.wait(userProgFutures),
+                      builder: (context, progSnapshot) {
+                        if (progSnapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        if (progSnapshot.hasError) {
+                          final allCoursesFiltered = filtered.map((course) {
+                            return {
+                              ...course,
+                              'progress': 0.0,
+                              'category': 'notstarted',
+                            };
+                          }).toList();
+                          return _buildListUI(context, allCoursesFiltered, [], [], filtered.isEmpty);
+                        }
+
+                        final progDocs = progSnapshot.data ?? [];
+                        List<Map<String, dynamic>> combined = [];
+                        for (int i = 0; i < filtered.length; i++) {
+                          final course = filtered[i];
+                          final raw = course['raw'];
+                          final progDoc = progDocs[i];
+                          double displayProgress = 0.0;
+
+                          if (progDoc.exists) {
+                            final data = progDoc.data() ?? {};
+                            final completed = data['completedLessons'];
+                            int completedCount = 0;
+                            if (completed is List) completedCount = completed.length;
+                            else if (completed is int) completedCount = completed;
+
+                            int totalLessons = 0;
+                            if (raw['lessons'] is List) totalLessons = (raw['lessons'] as List).length;
+
+                            if (totalLessons > 0) {
+                              displayProgress = (completedCount / totalLessons).clamp(0.0, 1.0);
+                            }
+                          }
+
+                          String category;
+                          if (displayProgress >= 1.0) category = 'complete';
+                          else if (displayProgress > 0.0) category = 'inprogress';
+                          else category = 'notstarted';
+
+                          combined.add({
+                            ...course,
+                            'progress': displayProgress,
+                            'category': category,
+                          });
+                        }
+
+                        final completeCourses = combined.where((c) => c['category'] == 'complete').toList();
+                        final inProgressCourses = combined.where((c) => c['category'] == 'inprogress').toList();
+                        return _buildListUI(context, combined, completeCourses, inProgressCourses, combined.isEmpty);
+                      },
+                    );
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, bool showSeeAll, VoidCallback? onSeeAllPressed) {
+  Widget _buildListUI(BuildContext context, List<Map<String, dynamic>> allCoursesFiltered,
+      List<Map<String, dynamic>> completeCourses, List<Map<String, dynamic>> inProgressCourses, bool isEmpty) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (completeCourses.isNotEmpty) ...[
+            _buildSectionHeader('Complete', completeCourses.length > 2, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LearningHubCompleteScreen()),
+              ).then((_) {
+                setState(() {
+                  _shouldRefresh = true;
+                });
+              });
+            }),
+            const SizedBox(height: 12.0),
+            ...completeCourses.take(2).map((course) => _learningItemCardFromMap(course)),
+            const SizedBox(height: 24.0),
+          ],
+          if (inProgressCourses.isNotEmpty) ...[
+            _buildSectionHeader('In progress', inProgressCourses.length > 2, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LearningHubInprogressScreen()),
+              ).then((_) {
+                setState(() {
+                  _shouldRefresh = true;
+                });
+              });
+            }),
+            const SizedBox(height: 12.0),
+            ...inProgressCourses.take(2).map((course) => _learningItemCardFromMap(course)),
+            const SizedBox(height: 24.0),
+          ],
+          if (allCoursesFiltered.isNotEmpty) ...[
+            _buildSectionHeader('All learning', allCoursesFiltered.length > 2, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LearningHubAllScreen()),
+              ).then((_) {
+                setState(() {
+                  _shouldRefresh = true;
+                });
+              });
+            }),
+            const SizedBox(height: 12.0),
+            ...allCoursesFiltered.take(2).map((course) => _learningItemCardFromMap(course)),
+          ],
+          if (isEmpty) const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 40.0),
+              child: Text(
+                'No courses found',
+                style: TextStyle(fontSize: 18.0, color: Colors.grey),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, bool showSeeAll, VoidCallback onSeeAllPressed) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 20.0,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
+          style: const TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold, color: Colors.black87),
+        ),
+        if (showSeeAll) TextButton(
+          onPressed: onSeeAllPressed,
+          child: const Text(
+            'See All',
+            style: TextStyle(color: Color.fromRGBO(224, 124, 124, 1), fontSize: 16.0, fontWeight: FontWeight.w600),
           ),
         ),
-        if (showSeeAll)
-          TextButton(
-            onPressed: onSeeAllPressed,
-            child: const Text(
-              'See All',
-              style: TextStyle(
-                color: Colors.blue,
-                fontSize: 16.0,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
       ],
     );
   }
 
-  // MAIN: show per-user progress by listening to the user's progress doc for each learning
-  Widget _buildLearningItemFromMap(Map<String, dynamic> course) {
-    final title = course['title'] as String;
-    final subtitle = course['description'] as String;
-    final fallbackProgress = (course['progress'] as double?) ?? 0.0;
-    final imageUrl = course['imageUrl'] as String;
-    final raw = course['raw'] as Map<String, dynamic>;
-    final learningId = course['id'] as String;
+  Widget _learningItemCardFromMap(Map<String, dynamic> course) {
+    final title = course['title'];
+    final subtitle = course['description'];
+    final imageUrl = course['imageUrl'];
+    final progress = course['progress'] ?? 0.0;
+    final raw = course['raw'];
+    final learningId = course['id'];
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      // not signed in -> show fallback progress from root doc
-      return _learningItemCard(title, subtitle, imageUrl, fallbackProgress, raw, learningId);
-    }
-
-    final userProgStream = FirebaseFirestore.instance
-        .collection('learnings')
-        .doc(learningId)
-        .collection('userProgress')
-        .doc(user.uid)
-        .snapshots();
-
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: userProgStream,
-      builder: (context, snap) {
-        double displayProgress = fallbackProgress;
-        if (snap.hasData && snap.data!.exists) {
-          final data = snap.data!.data();
-          final completed = data?['completedLessons'];
-          int completedCount = 0;
-          if (completed is List) completedCount = completed.length;
-
-          int totalLessons = 0;
-          try {
-            if (raw['lessons'] is List) totalLessons = (raw['lessons'] as List).length;
-          } catch (_) {
-            totalLessons = 0;
-          }
-
-          if (totalLessons > 0) {
-            displayProgress = (completedCount / totalLessons).clamp(0.0, 1.0).toDouble();
-          } else {
-            displayProgress = fallbackProgress;
-          }
-        }
-        return _learningItemCard(title, subtitle, imageUrl, displayProgress, raw, learningId);
-      },
-    );
-  }
-
-  // Helper to build the card (reused whether we use fallback or user-specific progress)
-  Widget _learningItemCard(String title, String subtitle, String imageUrl, double progress,
-      Map<String, dynamic> raw, String learningId) {
     return InkWell(
       onTap: () {
         Navigator.push(
@@ -336,7 +370,11 @@ class _LearningHubScreenState extends State<LearningHubScreen> {
               rawData: raw,
             ),
           ),
-        );
+        ).then((_) {
+          setState(() {
+            _shouldRefresh = true;
+          });
+        });
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 8.0),
@@ -344,21 +382,13 @@ class _LearningHubScreenState extends State<LearningHubScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12.0),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.3),
-              spreadRadius: 1,
-              blurRadius: 6,
-              offset: const Offset(0, 3),
-            ),
-          ],
+          boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.3), spreadRadius: 1, blurRadius: 6, offset: const Offset(0, 3))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                // Image with fallback
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8.0),
                   child: Image.network(
@@ -366,15 +396,13 @@ class _LearningHubScreenState extends State<LearningHubScreen> {
                     width: 60,
                     height: 60,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: 60,
-                        height: 60,
-                        color: Colors.grey[100],
-                        alignment: Alignment.center,
-                        child: const Icon(Icons.description, color: Colors.grey),
-                      );
-                    },
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: 60,
+                      height: 60,
+                      color: Colors.grey[100],
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.description, color: Colors.grey),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16.0),
@@ -382,46 +410,40 @@ class _LearningHubScreenState extends State<LearningHubScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18.0,
-                        ),
-                      ),
+                      Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18.0)),
                       const SizedBox(height: 6.0),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14.0,
-                        ),
-                      ),
+                      Text(subtitle, style: TextStyle(color: Colors.grey[600], fontSize: 14.0)),
                     ],
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16.0),
-            LinearProgressIndicator(
-              value: (progress.clamp(0.0, 1.0)).toDouble(),
-              backgroundColor: Colors.grey[200],
-              valueColor: AlwaysStoppedAnimation<Color>(
-                progress >= 1.0 ? Colors.green : Colors.blue,
-              ),
-              minHeight: 8.0,
-            ),
-            const SizedBox(height: 8.0),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                '${(progress * 100).toInt()}%',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: progress >= 1.0 ? Colors.green : Colors.blue,
-                  fontSize: 16.0,
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: LinearProgressIndicator(
+                      value: progress.clamp(0.0, 1.0),
+                      backgroundColor: Colors.grey[200],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        progress >= 1.0 ? Colors.green : Colors.blue,
+                      ),
+                      minHeight: 10.0,
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12.0),
+                Text(
+                  '${(progress * 100).toInt()}%',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: progress >= 1.0 ? Colors.green : progress > 0.0 ? Colors.blue : Colors.grey,
+                    fontSize: 14.0,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

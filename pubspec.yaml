@@ -40,7 +40,7 @@ dependencies:
   firebase_auth: ^6.0.2
   firebase_storage: ^13.0.1
   provider: ^6.0.5
-  image_picker: ^1.0.4
+  image_picker: ^1.1.2
   signature: ^5.4.2
   intl: ^0.20.2
   cached_network_image: ^3.3.0
@@ -53,6 +53,8 @@ dependencies:
   shared_preferences: ^2.5.3
   fluttertoast: ^8.2.12
   flutter_secure_storage: ^9.2.4
+  path: ^1.9.0
+  dotted_border: ^2.1.0
 
 dev_dependencies:
   flutter_launcher_icons: ^0.14.4
@@ -92,7 +94,7 @@ flutter_launcher_icons:
 flutter_native_splash:
   android: true
   ios: true
-  web: true
+  web: false
 
   #color: "#ffffff"
   background_image: assets/images/background_Splash.jpg

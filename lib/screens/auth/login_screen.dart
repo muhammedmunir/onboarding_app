@@ -570,6 +570,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     prefixIcon: Icon(Icons.email),
                                   ),
                                   keyboardType: TextInputType.emailAddress,
+                                  
                                 ),
                                 const SizedBox(height: 20),
 

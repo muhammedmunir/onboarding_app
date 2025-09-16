@@ -4,10 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class LearningHubDetailScreen extends StatefulWidget {
-  final String learningId; // FIRESTORE DOC ID for the learning
+  final String learningId;
   final String courseTitle;
   final String courseDescription;
-  final double progress; // fallback/global progress (kept for compatibility)
+  final double progress;
   final Map<String, dynamic> rawData;
 
   const LearningHubDetailScreen({
@@ -65,7 +65,7 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
   }
 
   // Toggle completed state for current user for lesson index `idx`
-  Future<void> _toggleCompleted(int idx, bool currentlyCompleted) async {
+  Future<void> _toggleCompleted(int idx, bool currentlyCompleted, int totalLessons) async {
     final user = _auth.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -86,16 +86,36 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
         await userProgRef.set({
           'completedLessons': FieldValue.arrayRemove([idx]),
           'updatedAt': FieldValue.serverTimestamp(),
+          'userId': user.uid,
         }, SetOptions(merge: true));
       } else {
         // add index
         await userProgRef.set({
           'completedLessons': FieldValue.arrayUnion([idx]),
           'updatedAt': FieldValue.serverTimestamp(),
+          'userId': user.uid,
         }, SetOptions(merge: true));
       }
 
-      // success feedback (UI auto-updates via stream)
+      // Update the main learning document progress (only if user is the creator)
+      try {
+        final learningDoc = await _firestore.collection('learnings').doc(widget.learningId).get();
+        if (learningDoc.exists && learningDoc.data()?['createdBy'] == user.uid) {
+          final completedLessonsRef = await userProgRef.get();
+          final completedLessonsList = completedLessonsRef.data()?['completedLessons'] as List?;
+          final completedLessons = completedLessonsList?.length ?? 0;
+          final newProgress = totalLessons > 0 ? completedLessons / totalLessons : 0.0;
+          
+          await _firestore.collection('learnings').doc(widget.learningId).update({
+            'progress': newProgress,
+          });
+        }
+      } catch (e) {
+        // Silently fail if user doesn't have permission to update the main document
+        print('User not authorized to update main progress: $e');
+      }
+
+      // success feedback
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(currentlyCompleted ? 'Marked as not completed' : 'Marked as completed')),
       );
@@ -127,7 +147,6 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
     final totalLessons = lessons.length;
 
     final user = _auth.currentUser;
-    // stream of user's progress doc
     final userProgressStream = (user != null)
         ? _firestore
             .collection('learnings')
@@ -138,6 +157,7 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
         : const Stream.empty();
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           'Learning Overview',
@@ -172,7 +192,6 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: userProgressStream as Stream<DocumentSnapshot<Map<String, dynamic>>>?,
         builder: (context, snap) {
-          // derive completedIndexes set for current user
           Set<int> completedIndexes = {};
           if (snap.hasData && snap.data!.exists) {
             final data = snap.data!.data();
@@ -191,244 +210,326 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
           final completedCount = completedIndexes.length;
           final userProgress = totalLessons > 0 ? (completedCount / totalLessons) : 0.0;
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Cover image
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    coverImage,
-                    width: double.infinity,
-                    height: 180,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: double.infinity,
-                        height: 180,
-                        color: Colors.grey[200],
-                        alignment: Alignment.center,
-                        child: const Icon(Icons.image_not_supported, size: 48, color: Colors.grey),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16.0),
+          String overallStatus = 'Not Started';
+          Color statusColor = Colors.grey;
+          
+          if (completedCount > 0 && completedCount < totalLessons) {
+            overallStatus = 'In Progress';
+            statusColor = Colors.blue;
+          } else if (completedCount == totalLessons && totalLessons > 0) {
+            overallStatus = 'Completed';
+            statusColor = Colors.green;
+          }
 
-                // Title & meta
-                Text(
-                  widget.courseTitle,
-                  style: const TextStyle(
-                    fontSize: 24.0,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 8.0),
-                Text(
-                  widget.courseDescription,
-                  style: TextStyle(
-                    fontSize: 16.0,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 8.0),
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Created: $createdAt',
-                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                    ),
-                    const SizedBox(width: 12),
-                    if (widget.rawData['createdBy'] != null)
-                      Text(
-                        ' • By ${widget.rawData['createdBy']}',
-                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                      ),
-                  ],
-                ),
-
-                const SizedBox(height: 24.0),
-
-                // Lessons header + user progress summary
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Lessons',
-                      style: TextStyle(
-                        fontSize: 20.0,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    Text(
-                      '${completedCount}/${totalLessons} completed',
-                      style: TextStyle(color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12.0),
-
-                // Lessons list
-                if (lessons.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20.0),
-                    child: Text(
-                      'No lessons found for this course.',
-                      style: TextStyle(color: Colors.grey[600]),
-                    ),
-                  )
-                else
-                  Column(
-                    children: lessons.asMap().entries.map((entry) {
-                      final idx = entry.key;
-                      final lesson = entry.value;
-                      final lessonTitle = (lesson['title'] as String?) ?? 'Lesson ${idx + 1}';
-                      final lessonDesc = (lesson['description'] as String?) ?? '';
-                      final contentType = (lesson['contentType'] as String?) ?? '';
-                      final contentUrl = (lesson['contentUrl'] as String?) ?? '';
-
-                      final completed = completedIndexes.contains(idx);
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12.0),
-                        padding: const EdgeInsets.all(12.0),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12.0),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.12),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    lessonTitle,
-                                    style: const TextStyle(
-                                      fontSize: 16.0,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                // Completed badge (per user)
-                                if (completed)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.withOpacity(0.12),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: Colors.green.withOpacity(0.25)),
-                                    ),
-                                    child: const Text(
-                                      'Completed',
-                                      style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            if (lessonDesc.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                lessonDesc,
-                                style: TextStyle(color: Colors.grey[600]),
-                              ),
-                            ],
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                if (contentType.isNotEmpty)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                    margin: const EdgeInsets.only(right: 8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[100],
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      contentType,
-                                      style: TextStyle(color: Colors.grey[700]),
-                                    ),
-                                  ),
-                                if (contentUrl.isNotEmpty)
-                                  ElevatedButton.icon(
-                                    onPressed: () => _openUrl(context, contentUrl),
-                                    icon: const Icon(Icons.open_in_new, size: 16),
-                                    label: const Text('Open'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color.fromRGBO(224, 124, 124, 1),
-                                      elevation: 0,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                    ),
-                                  ),
-                                if (contentUrl.isEmpty)
-                                  Text(
-                                    'No content URL',
-                                    style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                                  ),
-                                const Spacer(),
-                                // Toggle completion button (only for authenticated user)
-                                if (user != null)
-                                  IconButton(
-                                    onPressed: () => _toggleCompleted(idx, completed),
-                                    icon: Icon(
-                                      completed ? Icons.check_circle : Icons.radio_button_unchecked,
-                                      color: completed ? Colors.green : Colors.grey,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-
-                const SizedBox(height: 24.0),
-
-                // Progress Section (use user's progress when logged in, otherwise fallback to widget.progress)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16.0),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(12.0),
-                  ),
+          return Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      LinearProgressIndicator(
-                        value: user != null ? userProgress.clamp(0.0, 1.0) : widget.progress.clamp(0.0, 1.0),
-                        backgroundColor: Colors.grey[300],
-                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
-                        minHeight: 10.0,
+                      // Cover image
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          coverImage,
+                          width: double.infinity,
+                          height: 180,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: double.infinity,
+                              height: 180,
+                              color: Colors.grey[200],
+                              alignment: Alignment.center,
+                              child: const Icon(Icons.image_not_supported, size: 48, color: Colors.grey),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 16.0),
+
+                      // Title & meta
+                      Text(
+                        widget.courseTitle,
+                        style: const TextStyle(
+                          fontSize: 24.0,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
                       ),
                       const SizedBox(height: 8.0),
                       Text(
-                        '${((user != null ? userProgress : widget.progress) * 100).toInt()}%',
-                        style: const TextStyle(
-                          fontSize: 18.0,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
+                        widget.courseDescription,
+                        style: TextStyle(
+                          fontSize: 16.0,
+                          color: Colors.grey[600],
                         ),
                       ),
+                      const SizedBox(height: 8.0),
+                      
+                      // Status badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: statusColor.withOpacity(0.3)),
+                        ),
+                        child: Text(
+                          overallStatus,
+                          style: TextStyle(
+                            color: statusColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 8.0),
+                      Row(
+                        children: [
+                          const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Created: $createdAt',
+                            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                          ),
+                          // const SizedBox(width: 12),
+                          // if (widget.rawData['createdBy'] != null)
+                          //   Text(
+                          //     ' • By ${widget.rawData['createdBy']}',
+                          //     style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                          //   ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 24.0),
+
+                      // Lessons header + user progress summary
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Lessons',
+                            style: TextStyle(
+                              fontSize: 20.0,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          Text(
+                            '${completedCount}/${totalLessons} completed',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12.0),
+
+                      // Lessons list
+                      if (lessons.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20.0),
+                          child: Text(
+                            'No lessons found for this course.',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        )
+                      else
+                        Column(
+                          children: lessons.asMap().entries.map((entry) {
+                            final idx = entry.key;
+                            final lesson = entry.value;
+                            final lessonTitle = (lesson['title'] as String?) ?? 'Lesson ${idx + 1}';
+                            final lessonDesc = (lesson['description'] as String?) ?? '';
+                            final contentType = (lesson['contentType'] as String?) ?? '';
+                            final contentUrl = (lesson['contentUrl'] as String?) ?? '';
+                            final completed = completedIndexes.contains(idx);
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12.0),
+                              padding: const EdgeInsets.all(12.0),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12.0),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.12),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          lessonTitle,
+                                          style: const TextStyle(
+                                            fontSize: 16.0,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      if (completed)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green.withOpacity(0.12),
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(color: Colors.green.withOpacity(0.25)),
+                                          ),
+                                          child: const Text(
+                                            'Completed',
+                                            style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  if (lessonDesc.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      lessonDesc,
+                                      style: TextStyle(color: Colors.grey[600]),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      if (contentType.isNotEmpty)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                          margin: const EdgeInsets.only(right: 8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[100],
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            contentType,
+                                            style: TextStyle(color: Colors.grey[700]),
+                                          ),
+                                        ),
+                                      if (contentUrl.isNotEmpty)
+                                        ElevatedButton.icon(
+                                          onPressed: () => _openUrl(context, contentUrl),
+                                          icon: const Icon(Icons.open_in_new, size: 16, color: Colors.white),
+                                          label: const Text('Open', style: TextStyle(color: Colors.white)),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color.fromRGBO(224, 124, 124, 1),
+                                            elevation: 0,
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                          ),
+                                        ),
+                                      if (contentUrl.isEmpty)
+                                        Text(
+                                          'No content URL',
+                                          style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                                        ),
+                                      const Spacer(),
+                                      if (user != null)
+                                        IconButton(
+                                          onPressed: () => _toggleCompleted(idx, completed, totalLessons),
+                                          icon: Icon(
+                                            completed ? Icons.check_circle : Icons.radio_button_unchecked,
+                                            color: completed ? Colors.green : Colors.grey,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
-              ],
-            ),
+              ),
+
+              // Progress Section (Fixed at the bottom)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20.0),
+                    topRight: Radius.circular(20.0),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      spreadRadius: 2,
+                      blurRadius: 8,
+                      offset: const Offset(0, -3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Your Progress',
+                          style: TextStyle(
+                            fontSize: 16.0,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        Text(
+                          overallStatus,
+                          style: TextStyle(
+                            fontSize: 14.0,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16.0),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: LinearProgressIndicator(
+                              value: user != null ? userProgress.clamp(0.0, 1.0) : widget.progress.clamp(0.0, 1.0),
+                              backgroundColor: Colors.grey[300],
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                userProgress >= 1.0 ? Colors.green : Colors.blue,
+                              ),
+                              minHeight: 12.0,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16.0),
+                        Text(
+                          '${((user != null ? userProgress : widget.progress) * 100).toInt()}%',
+                          style: TextStyle(
+                            fontSize: 18.0,
+                            fontWeight: FontWeight.bold,
+                            color: userProgress >= 1.0
+                                ? Colors.green
+                                : userProgress > 0.0
+                                    ? Colors.blue
+                                    : Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           );
         },
       ),

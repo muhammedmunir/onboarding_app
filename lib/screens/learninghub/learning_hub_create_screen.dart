@@ -121,7 +121,7 @@ class _LearningHubCreateScreenState extends State<LearningHubCreateScreen> {
         'description': _descriptionController.text.trim(),
         'coverImageUrl': _coverImageUrlController.text.trim(),
         'lessons': lessonsData,
-        'progress': 0.0,
+        //'progress': 0.0,
         'createdAt': FieldValue.serverTimestamp(),
         'totalLessons': lessonsData.length,
         'createdBy': user.uid, // **PENTING** — mesti padankan dengan rules
