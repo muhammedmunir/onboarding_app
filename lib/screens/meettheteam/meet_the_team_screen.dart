@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:onboarding_app/screens/meettheteam/organization_chart_screen.dart';
 import 'package:onboarding_app/screens/meettheteam/organization_screen.dart';
 import 'package:onboarding_app/screens/meettheteam/user_profile_detail_screen.dart';
 
@@ -172,7 +173,7 @@ class _MeetTheTeamScreenState extends State<MeetTheTeamScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const OrganizationScreen(),
+                        builder: (_) => const OrganizationChartScreen(),
                       ),
                     );
                   },

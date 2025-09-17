@@ -29,7 +29,7 @@ class _AppBarMyJourneyState extends State<AppBarMyJourney> with SingleTickerProv
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Learning Hub',
+          'My Journey',
           style: TextStyle(color: Colors.black),
         ),
         centerTitle: true,
