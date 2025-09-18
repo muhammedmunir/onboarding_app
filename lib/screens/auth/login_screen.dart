@@ -53,19 +53,18 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final localAuthProv = Provider.of<LocalAuthenticationProvider>(context, listen: false);
       final prefs = await SharedPreferences.getInstance();
-      
-      // Use the new comprehensive check
-      final isBioAvailable = await localAuthProv.isBiometricAvailable();
+      final canCheck = await localAuthProv.checkBiometricAvailability();
       final bioEnabled = prefs.getBool(_kBiometricEnabledKey) ?? false;
 
-      // Also check saved credentials
+      // Also check available biometrics and saved credentials
+      final available = await localAuthProv.getAvailableBiometrics();
       final savedEmail = await _secureStorage.read(key: _kSavedEmailKey) ?? '';
       final savedPassword = await _secureStorage.read(key: _kSavedPasswordKey) ?? '';
 
-      debugPrint('evaluateBiometricAvailability -> isBioAvailable: $isBioAvailable, bioEnabled: $bioEnabled, savedEmail: ${savedEmail.isNotEmpty}');
+      debugPrint('evaluateBiometricAvailability -> canCheck: $canCheck, bioEnabled: $bioEnabled, available: $available, savedEmail: ${savedEmail.isNotEmpty}');
 
       setState(() {
-        _showBiometricButton = isBioAvailable && bioEnabled && savedEmail.isNotEmpty && savedPassword.isNotEmpty;
+        _showBiometricButton = canCheck && bioEnabled && available.isNotEmpty && savedEmail.isNotEmpty && savedPassword.isNotEmpty;
       });
     } catch (e) {
       // if something fails, just hide biometric button
@@ -86,10 +85,9 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Use the new comprehensive check
-    final isBioAvailable = await localAuthProv.isBiometricAvailable();
-    if (!isBioAvailable) {
-      debugPrint('_tryAutoBiometricLogin -> biometric not available');
+    final canCheck = await localAuthProv.checkBiometricAvailability();
+    if (!canCheck) {
+      debugPrint('_tryAutoBiometricLogin -> device cannot check biometrics');
       return;
     }
 
@@ -251,12 +249,11 @@ class _LoginScreenState extends State<LoginScreen> {
     final localAuthProv = Provider.of<LocalAuthenticationProvider>(context, listen: false);
     final prefs = await SharedPreferences.getInstance();
 
-    // Use the new comprehensive check
-    final bool isBioAvailable = await localAuthProv.isBiometricAvailable();
+    final bool canCheck = await localAuthProv.checkBiometricAvailability();
     final bool alreadyEnabled = prefs.getBool(_kBiometricEnabledKey) ?? false;
 
-    if (!isBioAvailable || alreadyEnabled) {
-      debugPrint('_offerEnableBiometricIfAvailable -> not available or already enabled');
+    if (!canCheck || alreadyEnabled) {
+      debugPrint('_offerEnableBiometricIfAvailable -> cant check or already enabled');
       return;
     }
 
@@ -332,11 +329,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final bool bioEnabled = prefs.getBool(_kBiometricEnabledKey) ?? false;
-      
-      // Use the new comprehensive check
-      final bool isBioAvailable = await localAuthProv.isBiometricAvailable();
+      final bool canCheck = await localAuthProv.checkBiometricAvailability();
 
-      if (!bioEnabled || !isBioAvailable) {
+      if (!bioEnabled || !canCheck) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

@@ -1,76 +1,10 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
-/// Parse event date which could be Timestamp, DateTime or String
-DateTime _parseEventDate(dynamic raw) {
-  if (raw == null) return DateTime.now();
-
-  // Firestore Timestamp
-  if (raw is Timestamp) {
-    return raw.toDate();
-  }
-
-  // Already DateTime
-  if (raw is DateTime) {
-    return raw;
-  }
-
-  // If string - try multiple parsing strategies
-  if (raw is String) {
-    // 1) Try ISO8601
-    final iso = DateTime.tryParse(raw);
-    if (iso != null) return iso;
-
-    // 2) Try to extract "d MMMM yyyy at HH:mm:ss" pattern (e.g. "12 September 2025 at 12:16:00 UTC+8")
-    try {
-      final parts = raw.split(' at ');
-      final datePart = parts.isNotEmpty ? parts[0].trim() : raw;
-      DateTime baseDate = DateFormat('d MMMM yyyy').parseLoose(datePart);
-
-      if (parts.length > 1) {
-        final timePart = parts[1];
-        // extract hh:mm:ss via regex
-        final match = RegExp(r'(\d{1,2}:\d{2}:\d{2})').firstMatch(timePart);
-        if (match != null) {
-          final hm = match.group(1)!;
-          final tParts = hm.split(':').map((e) => int.tryParse(e) ?? 0).toList();
-          if (tParts.length >= 3) {
-            baseDate = DateTime(baseDate.year, baseDate.month, baseDate.day, tParts[0], tParts[1], tParts[2]);
-            return baseDate;
-          }
-        }
-        // fallback: try HH:mm
-        final match2 = RegExp(r'(\d{1,2}:\d{2})').firstMatch(timePart);
-        if (match2 != null) {
-          final hm2 = match2.group(1)!;
-          final tParts = hm2.split(':').map((e) => int.tryParse(e) ?? 0).toList();
-          baseDate = DateTime(baseDate.year, baseDate.month, baseDate.day, tParts[0], tParts[1]);
-          return baseDate;
-        }
-      }
-
-      return baseDate;
-    } catch (_) {
-      // ignore and fallback
-    }
-
-    // 3) As final fallback: try parsing only d MMMM yyyy
-    try {
-      return DateFormat('d MMMM yyyy').parseLoose(raw);
-    } catch (_) {}
-
-    // 4) Last resort: now
-    return DateTime.now();
-  }
-
-  // Unknown type -> fallback
-  return DateTime.now();
-}
+import 'package:shared_preferences/shared_preferences.dart';
 
 class TimelineScreen extends StatefulWidget {
   const TimelineScreen({super.key});
@@ -90,6 +24,11 @@ class _TimelineScreenState extends State<TimelineScreen> {
   List<Map<String, dynamic>> _events = [];
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _eventsSubscription;
   StreamSubscription<User?>? _authSubscription;
+  
+  // New variables for user data and welcome section
+  Map<String, dynamic>? _userData;
+  bool _showWelcome = false;
+  SharedPreferences? _prefs;
 
   // Controllers for the add event form
   final TextEditingController _titleController = TextEditingController();
@@ -108,12 +47,14 @@ class _TimelineScreenState extends State<TimelineScreen> {
     super.initState();
     _selectedDate = DateTime.now();
     _generateVisibleDays();
+    _initPreferences();
 
     // Listen to auth changes - start listener only when user is logged in
     _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
       _currentUser = user;
       if (_currentUser != null) {
         _setupEventsListener();
+        _fetchUserData();
       } else {
         _eventsSubscription?.cancel();
         _eventsSubscription = null;
@@ -129,6 +70,42 @@ class _TimelineScreenState extends State<TimelineScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToCurrentDate();
     });
+  }
+
+  Future<void> _initPreferences() async {
+    _prefs = await SharedPreferences.getInstance();
+    bool hasSeenWelcome = _prefs?.getBool('hasSeenTimelineWelcome') ?? false;
+    
+    if (!hasSeenWelcome) {
+      if (mounted) {
+        setState(() {
+          _showWelcome = true;
+        });
+      }
+      // Mark that user has seen the welcome section
+      await _prefs?.setBool('hasSeenTimelineWelcome', true);
+    }
+  }
+
+  Future<void> _fetchUserData() async {
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (!mounted) return;
+        if (userDoc.exists) {
+          setState(() {
+            _userData = userDoc.data() as Map<String, dynamic>?;
+          });
+        }
+      }
+    } catch (e) {
+      print("Error fetching user data: $e");
+    }
   }
 
   @override
@@ -200,6 +177,71 @@ class _TimelineScreenState extends State<TimelineScreen> {
         SnackBar(content: Text('Failed to start events listener: ${e.toString()}')),
       );
     }
+  }
+
+  DateTime _parseEventDate(dynamic raw) {
+    if (raw == null) return DateTime.now();
+
+    // Firestore Timestamp
+    if (raw is Timestamp) {
+      return raw.toDate();
+    }
+
+    // Already DateTime
+    if (raw is DateTime) {
+      return raw;
+    }
+
+    // If string - try multiple parsing strategies
+    if (raw is String) {
+      // 1) Try ISO8601
+      final iso = DateTime.tryParse(raw);
+      if (iso != null) return iso;
+
+      // 2) Try to extract "d MMMM yyyy at HH:mm:ss" pattern (e.g. "12 September 2025 at 12:16:00 UTC+8")
+      try {
+        final parts = raw.split(' at ');
+        final datePart = parts.isNotEmpty ? parts[0].trim() : raw;
+        DateTime baseDate = DateFormat('d MMMM yyyy').parseLoose(datePart);
+
+        if (parts.length > 1) {
+          final timePart = parts[1];
+          // extract hh:mm:ss via regex
+          final match = RegExp(r'(\d{1,2}:\d{2}:\d{2})').firstMatch(timePart);
+          if (match != null) {
+            final hm = match.group(1)!;
+            final tParts = hm.split(':').map((e) => int.tryParse(e) ?? 0).toList();
+            if (tParts.length >= 3) {
+              baseDate = DateTime(baseDate.year, baseDate.month, baseDate.day, tParts[0], tParts[1], tParts[2]);
+              return baseDate;
+            }
+          }
+          // fallback: try HH:mm
+          final match2 = RegExp(r'(\d{1,2}:\d{2})').firstMatch(timePart);
+          if (match2 != null) {
+            final hm2 = match2.group(1)!;
+            final tParts = hm2.split(':').map((e) => int.tryParse(e) ?? 0).toList();
+            baseDate = DateTime(baseDate.year, baseDate.month, baseDate.day, tParts[0], tParts[1]);
+            return baseDate;
+          }
+        }
+
+        return baseDate;
+      } catch (_) {
+        // ignore and fallback
+      }
+
+      // 3) As final fallback: try parsing only d MMMM yyyy
+      try {
+        return DateFormat('d MMMM yyyy').parseLoose(raw);
+      } catch (_) {}
+
+      // 4) Last resort: now
+      return DateTime.now();
+    }
+
+    // Unknown type -> fallback
+    return DateTime.now();
   }
 
   void _generateVisibleDays() {
@@ -585,30 +627,34 @@ class _TimelineScreenState extends State<TimelineScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Welcome section
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Row(
-              children: [
-                // Avatar
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Colors.grey[200],
-                  child: const Icon(Icons.person, size: 40, color: Colors.grey),
-                ),
-                const SizedBox(width: 12),
-                // Welcome text - you may want to replace with actual user data later
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Welcome to TNB,', style: TextStyle(fontSize: 16, color: Colors.grey)),
-                    SizedBox(height: 4),
-                    Text('Siti Zubaidah', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ],
+          // Welcome section - only shown on first time
+          if (_showWelcome)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  // Avatar
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: Colors.grey[200],
+                    child: const Icon(Icons.person, size: 40, color: Colors.grey),
+                  ),
+                  const SizedBox(width: 12),
+                  // Welcome text with actual user data
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Welcome to TNB,', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                      const SizedBox(height: 4),
+                      Text(
+                        _userData?['username'] ?? 'User',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
           const SizedBox(height: 16),
 
           // Month and year navigation
