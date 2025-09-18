@@ -5,6 +5,37 @@ import 'package:local_auth/local_auth.dart';
 class LocalAuthenticationProvider with ChangeNotifier {
   final LocalAuthentication _auth = LocalAuthentication();
 
+  /// Comprehensive check for biometric availability
+  Future<bool> isBiometricAvailable() async {
+    try {
+      // Check if device supports biometric authentication
+      final supported = await isDeviceSupported();
+      if (!supported) {
+        debugPrint('Biometric not supported on this device');
+        return false;
+      }
+
+      // Check if biometric hardware is available
+      final canCheck = await checkBiometricAvailability();
+      if (!canCheck) {
+        debugPrint('Biometric hardware not available');
+        return false;
+      }
+
+      // Check if user has enrolled biometrics
+      final available = await getAvailableBiometrics();
+      if (available.isEmpty) {
+        debugPrint('No biometrics enrolled');
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('isBiometricAvailable error: $e');
+      return false;
+    }
+  }
+
   /// Returns true if the device *can* check biometrics (hardware + OS)
   Future<bool> checkBiometricAvailability() async {
     try {
@@ -50,10 +81,13 @@ class LocalAuthenticationProvider with ChangeNotifier {
       final supported = await isDeviceSupported();
       final canCheck = await checkBiometricAvailability();
       final available = await getAvailableBiometrics();
+      final isAvailable = await isBiometricAvailable();
+      
       return {
         'isDeviceSupported': supported,
         'canCheckBiometrics': canCheck,
         'availableBiometrics': available,
+        'isBiometricAvailable': isAvailable,
       };
     } catch (e) {
       debugPrint('debugBiometricStatus error -> $e');
@@ -66,25 +100,13 @@ class LocalAuthenticationProvider with ChangeNotifier {
   Future<Map<String, dynamic>> authenticateWithBiometricsDetailed({String? localizedReason}) async {
     final reason = localizedReason ?? 'Scan your fingerprint to authenticate';
     try {
-      // Pre-checks to give friendly messages instead of opaque PlatformException
-      final supported = await isDeviceSupported();
-      if (!supported) {
+      // Check if biometric is available before attempting authentication
+      final biometricAvailable = await isBiometricAvailable();
+      if (!biometricAvailable) {
         return {
           'success': false,
-          'message': 'Device does not support biometric authentication.',
-          'code': 'NotSupported'
-        };
-      }
-
-      final canCheck = await checkBiometricAvailability();
-      final available = await getAvailableBiometrics();
-      debugPrint('authenticate prechecks -> canCheck: $canCheck, available: $available');
-
-      if (!canCheck || available.isEmpty) {
-        return {
-          'success': false,
-          'message': 'No biometric enrolled or biometric not available. Please enable device lock (PIN/Passcode) and enroll fingerprints/Face ID in Settings.',
-          'code': 'NotEnrolledOrUnavailable'
+          'message': 'Biometric authentication is not available on this device.',
+          'code': 'NotAvailable'
         };
       }
 
@@ -126,7 +148,6 @@ class LocalAuthenticationProvider with ChangeNotifier {
         case 'no_fragment_activity':
         case 'NoFragmentActivity':
         case 'no_activity':
-          // keep original message but advise developer
           friendly = 'Activity not FragmentActivity. Ensure MainActivity extends FlutterFragmentActivity (see docs). ${e.message ?? ''}';
           break;
         default:
