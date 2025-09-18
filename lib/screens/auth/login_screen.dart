@@ -55,14 +55,20 @@ class _LoginScreenState extends State<LoginScreen> {
       final prefs = await SharedPreferences.getInstance();
       final canCheck = await localAuthProv.checkBiometricAvailability();
       final bioEnabled = prefs.getBool(_kBiometricEnabledKey) ?? false;
+
+      // Also check available biometrics and saved credentials
+      final available = await localAuthProv.getAvailableBiometrics();
       final savedEmail = await _secureStorage.read(key: _kSavedEmailKey) ?? '';
       final savedPassword = await _secureStorage.read(key: _kSavedPasswordKey) ?? '';
 
+      debugPrint('evaluateBiometricAvailability -> canCheck: $canCheck, bioEnabled: $bioEnabled, available: $available, savedEmail: ${savedEmail.isNotEmpty}');
+
       setState(() {
-        _showBiometricButton = canCheck && bioEnabled && savedEmail.isNotEmpty && savedPassword.isNotEmpty;
+        _showBiometricButton = canCheck && bioEnabled && available.isNotEmpty && savedEmail.isNotEmpty && savedPassword.isNotEmpty;
       });
     } catch (e) {
       // if something fails, just hide biometric button
+      debugPrint('evaluateBiometricAvailability error -> $e');
       setState(() {
         _showBiometricButton = false;
       });
@@ -70,15 +76,20 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _tryAutoBiometricLogin() async {
-    final localAuthProv =
-        Provider.of<LocalAuthenticationProvider>(context, listen: false);
+    final localAuthProv = Provider.of<LocalAuthenticationProvider>(context, listen: false);
     final prefs = await SharedPreferences.getInstance();
 
     final bool bioEnabled = prefs.getBool(_kBiometricEnabledKey) ?? false;
-    if (!bioEnabled) return;
+    if (!bioEnabled) {
+      debugPrint('_tryAutoBiometricLogin -> biometric not enabled in prefs');
+      return;
+    }
 
     final canCheck = await localAuthProv.checkBiometricAvailability();
-    if (!canCheck) return;
+    if (!canCheck) {
+      debugPrint('_tryAutoBiometricLogin -> device cannot check biometrics');
+      return;
+    }
 
     // Baca credentials dari secure storage
     String savedEmail = '';
@@ -88,22 +99,23 @@ class _LoginScreenState extends State<LoginScreen> {
       savedPassword = await _secureStorage.read(key: _kSavedPasswordKey) ?? '';
     } catch (e) {
       // ignore read error, fallback
+      debugPrint('_tryAutoBiometricLogin read secure storage error -> $e');
     }
 
     if (savedEmail.isNotEmpty && savedPassword.isNotEmpty) {
-      final bool authOK = await localAuthProv.authenticateWithBiometrics(
+      final result = await localAuthProv.authenticateWithBiometricsDetailed(
         localizedReason: 'Authenticate to sign in with saved credentials',
       );
-      if (authOK) {
+      debugPrint('Auto biometric login authenticate result: $result');
+      if (result['success'] == true) {
         setState(() {
           _isLoading = true;
         });
         try {
-          User? user =
-              await _authService.signInWithEmail(savedEmail, savedPassword);
+          User? user = await _authService.signInWithEmail(savedEmail, savedPassword);
           if (user != null) {
             if (user.emailVerified) {
-              // CHANGED: set loginStatus only after successful login
+              // set loginStatus only after successful login
               await prefs.setBool(_kLoginStatusKey, true);
 
               if (mounted) {
@@ -139,7 +151,16 @@ class _LoginScreenState extends State<LoginScreen> {
             });
           }
         }
+      } else {
+        // show message why failed
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Auto biometric auth failed: ${result['message']}'), backgroundColor: Colors.red),
+          );
+        }
       }
+    } else {
+      debugPrint('_tryAutoBiometricLogin -> no saved credentials found');
     }
   }
 
@@ -164,10 +185,9 @@ class _LoginScreenState extends State<LoginScreen> {
         // Check if email is verified
         if (user.emailVerified) {
           // selepas berjaya login, tanya user nak enable biometric?
-          await _offerEnableBiometricIfAvailable(
-              _emailController.text.trim(), _passwordController.text);
+          await _offerEnableBiometricIfAvailable(_emailController.text.trim(), _passwordController.text);
 
-          // CHANGED: set loginStatus only after successful login
+          // set loginStatus only after successful login
           final prefs = await SharedPreferences.getInstance();
           await prefs.setBool(_kLoginStatusKey, true);
 
@@ -225,16 +245,17 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _offerEnableBiometricIfAvailable(
-      String email, String password) async {
-    final localAuthProv =
-        Provider.of<LocalAuthenticationProvider>(context, listen: false);
+  Future<void> _offerEnableBiometricIfAvailable(String email, String password) async {
+    final localAuthProv = Provider.of<LocalAuthenticationProvider>(context, listen: false);
     final prefs = await SharedPreferences.getInstance();
 
     final bool canCheck = await localAuthProv.checkBiometricAvailability();
     final bool alreadyEnabled = prefs.getBool(_kBiometricEnabledKey) ?? false;
 
-    if (!canCheck || alreadyEnabled) return;
+    if (!canCheck || alreadyEnabled) {
+      debugPrint('_offerEnableBiometricIfAvailable -> cant check or already enabled');
+      return;
+    }
 
     // Tawarkan dialog untuk aktifkan biometric — ini TIDAK ubah UI utama (pop-up sahaja)
     if (!mounted) return;
@@ -244,8 +265,7 @@ class _LoginScreenState extends State<LoginScreen> {
       builder: (BuildContext ctx) {
         return AlertDialog(
           title: const Text('Enable Biometric Login?'),
-          content: const Text(
-              'Do you want to enable biometric login for faster sign-in next time?'),
+          content: const Text('Do you want to enable biometric login for faster sign-in next time?'),
           actions: <Widget>[
             TextButton(
               child: const Text('No'),
@@ -262,16 +282,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (enable == true) {
       // cuba authenticate dulu untuk confirm identity sebelum simpan
-      final authOK = await localAuthProv.authenticateWithBiometrics(
+      final result = await localAuthProv.authenticateWithBiometricsDetailed(
         localizedReason: 'Confirm to enable biometric login',
       );
-      if (authOK) {
+      debugPrint('Biometric enable attempt result: $result');
+
+      if (result['success'] == true) {
         // simpan email/password ke secure storage
         await _secureStorage.write(key: _kSavedEmailKey, value: email);
         await _secureStorage.write(key: _kSavedPasswordKey, value: password);
         await prefs.setBool(_kBiometricEnabledKey, true);
 
-        // CHANGED: update show button immediately
+        // update show button immediately
         setState(() {
           _showBiometricButton = true;
         });
@@ -287,9 +309,8 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content:
-                  Text('Could not enable biometric. Authentication failed.'),
+            SnackBar(
+              content: Text('Could not enable biometric. ${result['message']}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -299,8 +320,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _fingerPrintLogin() async {
-    final localAuthProv =
-        Provider.of<LocalAuthenticationProvider>(context, listen: false);
+    final localAuthProv = Provider.of<LocalAuthenticationProvider>(context, listen: false);
     final prefs = await SharedPreferences.getInstance();
 
     setState(() {
@@ -323,17 +343,14 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      final bool authOK = await localAuthProv.authenticateWithBiometrics(
+      final result = await localAuthProv.authenticateWithBiometricsDetailed(
         localizedReason: 'Authenticate to sign in',
       );
-
-      if (!authOK) {
+      debugPrint('Fingerprint button authenticate result: $result');
+      if (result['success'] != true) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Biometric authentication failed.'),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text('Biometric authentication failed: ${result['message']}'), backgroundColor: Colors.red),
           );
         }
         return;
@@ -346,7 +363,7 @@ class _LoginScreenState extends State<LoginScreen> {
         savedEmail = await _secureStorage.read(key: _kSavedEmailKey) ?? '';
         savedPassword = await _secureStorage.read(key: _kSavedPasswordKey) ?? '';
       } catch (e) {
-        // ignore read error
+        debugPrint('_fingerPrintLogin read secure storage error -> $e');
       }
 
       if (savedEmail.isEmpty || savedPassword.isEmpty) {
@@ -362,11 +379,10 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       // cuba sign-in dengan credentials tersimpan
-      User? user =
-          await _authService.signInWithEmail(savedEmail, savedPassword);
+      User? user = await _authService.signInWithEmail(savedEmail, savedPassword);
       if (user != null) {
         if (user.emailVerified) {
-          // CHANGED: set loginStatus only after successful login
+          // set loginStatus only after successful login
           await prefs.setBool(_kLoginStatusKey, true);
 
           if (mounted) {
@@ -412,9 +428,8 @@ class _LoginScreenState extends State<LoginScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Email Not Verified'),
-          content:
-              const Text('Please verify your email address before logging in. '
-                  'Check your inbox for a verification email.'),
+          content: const Text('Please verify your email address before logging in. '
+              'Check your inbox for a verification email.'),
           actions: <Widget>[
             TextButton(
               child: const Text('OK'),
@@ -557,9 +572,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     if (value == null || value.isEmpty) {
                                       return 'Please enter your email';
                                     }
-                                    if (!RegExp(
-                                            r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                        .hasMatch(value)) {
+                                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
                                       return 'Please enter a valid email';
                                     }
                                     return null;
@@ -570,7 +583,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                     prefixIcon: Icon(Icons.email),
                                   ),
                                   keyboardType: TextInputType.emailAddress,
-                                  
                                 ),
                                 const SizedBox(height: 20),
 
@@ -593,9 +605,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     prefixIcon: const Icon(Icons.lock),
                                     suffixIcon: IconButton(
                                       icon: Icon(
-                                        _obscurePassword
-                                            ? Icons.visibility
-                                            : Icons.visibility_off,
+                                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
                                       ),
                                       onPressed: () {
                                         setState(() {
@@ -615,8 +625,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) =>
-                                              const ForgotPasswordScreen(),
+                                          builder: (context) => const ForgotPasswordScreen(),
                                         ),
                                       );
                                     },
@@ -632,8 +641,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                                 // Button Login + Biometric di sebelah
                                 _isLoading
-                                    ? const Center(
-                                        child: CircularProgressIndicator())
+                                    ? const Center(child: CircularProgressIndicator())
                                     : Row(
                                         children: [
                                           Expanded(
@@ -641,22 +649,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                             child: ElevatedButton(
                                               onPressed: _login,
                                               style: ElevatedButton.styleFrom(
-                                                backgroundColor:
-                                                    const Color.fromRGBO(
-                                                        224, 124, 124, 1),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        vertical: 16),
+                                                backgroundColor: const Color.fromRGBO(224, 124, 124, 1),
+                                                padding: const EdgeInsets.symmetric(vertical: 16),
                                                 shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(30),
+                                                  borderRadius: BorderRadius.circular(30),
                                                 ),
                                               ),
                                               child: const Text(
                                                 "Login",
-                                                style: TextStyle(
-                                                    fontSize: 18,
-                                                    color: Colors.white),
+                                                style: TextStyle(fontSize: 18, color: Colors.white),
                                               ),
                                             ),
                                           ),
@@ -668,17 +669,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                                   height: 48,
                                                   child: ElevatedButton(
                                                     onPressed: _fingerPrintLogin,
-                                                    style:
-                                                        ElevatedButton.styleFrom(
-                                                      backgroundColor:
-                                                          const Color.fromRGBO(
-                                                              224, 124, 124, 1),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: const Color.fromRGBO(224, 124, 124, 1),
                                                       padding: EdgeInsets.zero,
-                                                      shape:
-                                                          RoundedRectangleBorder(
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(12),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(12),
                                                       ),
                                                       elevation: 4,
                                                     ),
@@ -708,16 +703,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                            builder: (context) =>
-                                                const RegisterScreen(),
+                                            builder: (context) => const RegisterScreen(),
                                           ),
                                         );
                                       },
                                       child: const Text(
                                         "Register Now",
                                         style: TextStyle(
-                                          color:
-                                              Color.fromRGBO(224, 124, 124, 1),
+                                          color: Color.fromRGBO(224, 124, 124, 1),
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
