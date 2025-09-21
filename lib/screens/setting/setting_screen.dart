@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:onboarding_app/screens/setting/device_permission_screen.dart';
+import 'package:onboarding_app/screens/setting/language_translation_screen.dart';
+import 'package:onboarding_app/screens/setting/manage_your_account_screen.dart';
 import 'package:onboarding_app/services/theme_service.dart';
 
 class SettingScreen extends StatefulWidget {
@@ -12,68 +16,79 @@ class _SettingScreenState extends State<SettingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Let the app bar styling come from the theme (no hard-coded colors)
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: Text(AppLocalizations.of(context)!.settings),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: Colors.transparent, // keep transparent if you want
+        backgroundColor: Colors.transparent,
         automaticallyImplyLeading: false,
       ),
       body: ListView(
         children: [
-          _buildSectionHeader('Account'),
+          _buildSectionHeader(AppLocalizations.of(context)!.account),
           _buildListTile(
-            title: 'Manage Your Account',
+            title: AppLocalizations.of(context)!.manageYourAccount,
             icon: Icons.account_circle_outlined,
             onTap: () {
-              // Navigate to account management screen
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const ManageAccountScreen(user: {}),
+                ),
+              );
             },
           ),
-          _buildSectionHeader('Preferences'),
+          _buildSectionHeader(AppLocalizations.of(context)!.preferences),
           _buildListTile(
-            title: 'Device Permission',
+            title: AppLocalizations.of(context)!.devicePermission,
             icon: Icons.perm_device_info_outlined,
             onTap: () {
-              // Navigate to device permission screen
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const DevicePermissionScreen(),
+                ),
+              );
             },
           ),
           _buildListTile(
-            title: 'Language and Translations',
+            title: AppLocalizations.of(context)!.languageAndTranslations,
             icon: Icons.language_outlined,
             onTap: () {
-              // Navigate to language selection screen
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const LanguageTranslationScreen(),
+                ),
+              );
             },
           ),
 
-          // Listen to the themeNotifier to update the UI in real time
           ValueListenableBuilder<ThemeMode>(
-  valueListenable: themeNotifier,
-  builder: (context, ThemeMode mode, _) {
-    final isDark = mode == ThemeMode.dark;
-    return SwitchListTile(
-      title: const Text('Dark Mode'),
-      secondary: Icon(
-        isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
-      ),
-      activeColor: const Color.fromRGBO(224, 124, 124, 1), // warna toggle bila ON
-      value: isDark,
-      onChanged: (value) {
-        themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light;
-      },
-    );
-  },
-),
+            valueListenable: themeNotifier,
+            builder: (context, ThemeMode mode, _) {
+              final isDark = mode == ThemeMode.dark;
+              return SwitchListTile(
+                title: Text(AppLocalizations.of(context)!.darkMode),
+                secondary: Icon(
+                  isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+                ),
+                activeColor: Colors.grey,
+                value: isDark,
+                onChanged: (value) {
+                  themeNotifier.value =
+                      value ? ThemeMode.dark : ThemeMode.light;
+                },
+              );
+            },
+          ),
 
           const SizedBox(height: 16),
-          _buildSectionHeader('About'),
+          _buildSectionHeader(AppLocalizations.of(context)!.about),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
                 Icon(Icons.info_outline, color: Theme.of(context).iconTheme.color),
                 const SizedBox(width: 16),
-                const Text('Version'),
+                Text(AppLocalizations.of(context)!.version),
                 const Spacer(),
                 Text(
                   '1.0.0',
@@ -97,7 +112,6 @@ class _SettingScreenState extends State<SettingScreen> {
         style: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          // keep using primary color for section headers — that works in both themes
           color: Color.fromRGBO(224, 124, 124, 1),
         ),
       ),
@@ -110,8 +124,8 @@ class _SettingScreenState extends State<SettingScreen> {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon), // color now follows theme's iconTheme
-      title: Text(title), // color follows theme text
+      leading: Icon(icon),
+      title: Text(title),
       trailing: const Icon(Icons.chevron_right),
       onTap: onTap,
     );
