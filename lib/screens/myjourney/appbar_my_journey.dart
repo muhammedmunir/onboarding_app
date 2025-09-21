@@ -26,16 +26,27 @@ class _AppBarMyJourneyState extends State<AppBarMyJourney> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bool isDarkMode = theme.brightness == Brightness.dark;
+    final appBarColor = theme.appBarTheme.backgroundColor ?? theme.scaffoldBackgroundColor;
+    final textColor = theme.textTheme.bodyLarge?.color;
+    final hintColor = theme.hintColor;
+    
+    // Colors that adapt to theme
+    final primaryColor = isDarkMode 
+        ? const Color.fromRGBO(180, 100, 100, 1) // Darker pink for dark mode
+        : const Color.fromRGBO(224, 124, 124, 1);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'My Journey',
-          style: TextStyle(color: Colors.black),
+          style: TextStyle(color: textColor),
         ),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: const Color.fromARGB(0, 255, 255, 255),
-        foregroundColor: Colors.black,
+        backgroundColor: appBarColor,
+        foregroundColor: textColor,
         automaticallyImplyLeading: false,
         leading: Center(
           child: InkWell(
@@ -45,7 +56,7 @@ class _AppBarMyJourneyState extends State<AppBarMyJourney> with SingleTickerProv
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: const Color.fromRGBO(224, 124, 124, 1),
+                color: primaryColor,
                 borderRadius: BorderRadius.circular(6),
               ),
               alignment: Alignment.center,
@@ -59,9 +70,9 @@ class _AppBarMyJourneyState extends State<AppBarMyJourney> with SingleTickerProv
         ),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.blue,
-          labelColor: Colors.blue,
-          unselectedLabelColor: Colors.grey,
+          indicatorColor: primaryColor,
+          labelColor: primaryColor,
+          unselectedLabelColor: hintColor,
           labelStyle: const TextStyle(fontWeight: FontWeight.bold),
           tabs: const [
             Tab(text: 'Timeline'),

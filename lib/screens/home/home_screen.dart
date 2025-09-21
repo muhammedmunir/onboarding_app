@@ -4,6 +4,7 @@ import 'package:flutter_svg/svg.dart';
 import 'package:onboarding_app/screens/auth/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:onboarding_app/screens/document/document_screen.dart';
 import 'package:onboarding_app/screens/learninghub/learning_hub_screen.dart';
 import 'package:onboarding_app/screens/meettheteam/meet_the_team_screen.dart';
 import 'package:onboarding_app/screens/myjourney/appbar_my_journey.dart';
@@ -170,27 +171,39 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bool isDarkMode = theme.brightness == Brightness.dark;
+    
+    // Colors that adapt to theme
+    final primaryColor = isDarkMode 
+        ? const Color.fromRGBO(180, 100, 100, 1) // Darker pink for dark mode
+        : const Color.fromRGBO(224, 124, 124, 1);
+
     // Show loading indicator while checking verification
     if (_isCheckingVerification) {
-      return const Scaffold(
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
         body: Center(
-          child: CircularProgressIndicator(),
+          child: CircularProgressIndicator(
+            color: primaryColor,
+          ),
         ),
       );
     }
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: _screens[_selectedIndex],
-      bottomNavigationBar: _buildBottomNavBar(),
+      bottomNavigationBar: _buildBottomNavBar(primaryColor),
     );
   }
 
   // Bottom Navigation Bar
-  Widget _buildBottomNavBar() {
+  Widget _buildBottomNavBar(Color primaryColor) {
     return CurvedNavigationBar(
       backgroundColor: Colors.transparent,
-      color: const Color.fromRGBO(224, 124, 124, 1),
-      buttonBackgroundColor: const Color.fromRGBO(224, 124, 124, 1),
+      color: primaryColor,
+      buttonBackgroundColor: primaryColor,
       height: 60,
       items: const <Widget>[
         Icon(Icons.home, size: 30, color: Colors.white),
@@ -215,7 +228,7 @@ class HomeContent extends StatefulWidget {
 class _HomeContentState extends State<HomeContent> {
   bool _isHeaderExpanded = false;
   Map<String, dynamic>? _userData;
-  final Color primaryColor = const Color.fromRGBO(224, 124, 124, 1);
+  Color? primaryColor;
 
   @override
   void initState() {
@@ -272,21 +285,33 @@ class _HomeContentState extends State<HomeContent> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bool isDarkMode = theme.brightness == Brightness.dark;
+    
+    // Colors that adapt to theme
+    primaryColor = isDarkMode 
+        ? const Color.fromRGBO(180, 100, 100, 1) // Darker pink for dark mode
+        : const Color.fromRGBO(224, 124, 124, 1);
+        
+    final cardColor = theme.cardColor;
+    final textColor = theme.textTheme.bodyLarge?.color;
+    final hintColor = theme.hintColor;
+
     return SafeArea(
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header Pengguna dengan kemampuan stretch
-            _buildExpandableUserHeader(primaryColor),
+            _buildExpandableUserHeader(primaryColor!),
             const SizedBox(height: 24),
 
             // Bahagian Quick Action
-            _buildQuickActions(primaryColor),
+            _buildQuickActions(primaryColor!, cardColor, textColor),
             const SizedBox(height: 24),
 
             // Bahagian Berita
-            _buildNewsSection(),
+            _buildNewsSection(textColor),
             const SizedBox(height: 24),
           ],
         ),
@@ -296,6 +321,9 @@ class _HomeContentState extends State<HomeContent> {
 
   // Widget untuk header pengguna yang dapat di-expand
   Widget _buildExpandableUserHeader(Color primaryColor) {
+    final theme = Theme.of(context);
+    final textColor = theme.textTheme.bodyLarge?.color;
+
     return GestureDetector(
       onTap: _toggleHeaderExpansion,
       child: AnimatedContainer(
@@ -428,21 +456,21 @@ class _HomeContentState extends State<HomeContent> {
   // -----------------------------
   // Quick Actions - design with 3 columns (more compact)
   // -----------------------------
-  Widget _buildQuickActions(Color primaryColor) {
+  Widget _buildQuickActions(Color primaryColor, Color cardColor, Color? textColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             "Quick Action",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
           ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
@@ -463,12 +491,12 @@ class _HomeContentState extends State<HomeContent> {
                       _buildSmallActionCompact(
                           SvgPicture.asset("assets/svgs/Learning Hub.svg"),
                           "Learning\nHub",
-                          primaryColor),
+                          primaryColor, textColor),
                       const SizedBox(height: 20),
                       _buildSmallActionCompact(
                           SvgPicture.asset("assets/svgs/Facilities.svg"),
                           "Facilities\n",
-                          primaryColor),
+                          primaryColor, textColor),
                       const SizedBox(height: 50),
                     ],
                   ),
@@ -481,14 +509,14 @@ class _HomeContentState extends State<HomeContent> {
                       _buildSmallActionCompact(
                           SvgPicture.asset("assets/svgs/My Document.svg"),
                           "My\nDocument",
-                          primaryColor),
+                          primaryColor, textColor),
                       const SizedBox(height: 20),
                       _buildCenterJourneyCompact(primaryColor),
                       const SizedBox(height: 20),
                       _buildSmallActionCompact(
                           SvgPicture.asset("assets/svgs/Task Manager.svg"),
                           "Task\nManager",
-                          primaryColor),
+                          primaryColor, textColor),
                     ],
                   ),
                 ),
@@ -501,12 +529,12 @@ class _HomeContentState extends State<HomeContent> {
                       _buildSmallActionCompact(
                           SvgPicture.asset("assets/svgs/Meet the Team.svg"),
                           "Meet the\nTeam",
-                          primaryColor),
+                          primaryColor, textColor),
                       const SizedBox(height: 20),
                       _buildSmallActionCompact(
                           SvgPicture.asset("assets/svgs/Buddy Chat.svg"),
                           "Buddy\nChat",
-                          primaryColor),
+                          primaryColor, textColor),
                       const SizedBox(height: 50),
                     ],
                   ),
@@ -520,7 +548,7 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   // Compact small action item
-  Widget _buildSmallActionCompact(Widget icon, String label, Color color) {
+  Widget _buildSmallActionCompact(Widget icon, String label, Color color, Color? textColor) {
     return GestureDetector(
       onTap: () {
         if (label == "Learning\nHub") {
@@ -543,7 +571,7 @@ class _HomeContentState extends State<HomeContent> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const TimelineScreen(),
+              builder: (context) => const DocumentManagerScreen(),
             ),
           );
         }
@@ -551,7 +579,7 @@ class _HomeContentState extends State<HomeContent> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const DocumentManagerScreen(),
+              builder: (context) => const TaskManagerScreen(),
             ),
           );
         }
@@ -580,7 +608,7 @@ class _HomeContentState extends State<HomeContent> {
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11),
+            style: TextStyle(fontSize: 11, color: textColor),
           ),
         ],
       ),
@@ -589,6 +617,9 @@ class _HomeContentState extends State<HomeContent> {
 
   // Compact center big circular "My Journey"
   Widget _buildCenterJourneyCompact(Color color) {
+    final theme = Theme.of(context);
+    final bool isDarkMode = theme.brightness == Brightness.dark;
+    
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -604,7 +635,7 @@ class _HomeContentState extends State<HomeContent> {
             height: 120,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color.fromRGBO(245, 245, 247, 1),
+              color: isDarkMode ? Colors.grey[800] : const Color.fromRGBO(245, 245, 247, 1),
               boxShadow: [
                 BoxShadow(
                   color: Colors.grey.withOpacity(0.12),
@@ -612,7 +643,7 @@ class _HomeContentState extends State<HomeContent> {
                   offset: const Offset(0, 4),
                 ),
                 BoxShadow(
-                  color: Colors.white.withOpacity(0.18),
+                  color: isDarkMode ? Colors.black.withOpacity(0.18) : Colors.white.withOpacity(0.18),
                   blurRadius: 16,
                   offset: const Offset(0, 0),
                   spreadRadius: 2,
@@ -661,15 +692,18 @@ class _HomeContentState extends State<HomeContent> {
   // -----------------------------
   // News section
   // -----------------------------
-  Widget _buildNewsSection() {
+  Widget _buildNewsSection(Color? textColor) {
+    final theme = Theme.of(context);
+    final bool isDarkMode = theme.brightness == Brightness.dark;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.0),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Text(
             "News",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor),
           ),
         ),
         const SizedBox(height: 16),
@@ -685,9 +719,12 @@ class _HomeContentState extends State<HomeContent> {
                 margin: const EdgeInsets.only(right: 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(15),
-                  image: const DecorationImage(
-                    image: AssetImage("assets/images/background_news.jpeg"),
+                  image: DecorationImage(
+                    image: const AssetImage("assets/images/background_news.jpeg"),
                     fit: BoxFit.cover,
+                    colorFilter: isDarkMode 
+                        ? ColorFilter.mode(Colors.black.withOpacity(0.5), BlendMode.darken)
+                        : null,
                   ),
                 ),
                 child: Container(

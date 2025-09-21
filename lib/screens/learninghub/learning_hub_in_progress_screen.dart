@@ -4,14 +4,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'learning_hub_detail_screen.dart';
 
-class LearningHubAllScreen extends StatefulWidget {
-  const LearningHubAllScreen({super.key});
+class LearningHubInprogressScreen extends StatefulWidget {
+  const LearningHubInprogressScreen({super.key});
 
   @override
-  State<LearningHubAllScreen> createState() => _LearningHubAllScreenState();
+  State<LearningHubInprogressScreen> createState() => _LearningHubInprogressScreenState();
 }
 
-class _LearningHubAllScreenState extends State<LearningHubAllScreen> {
+class _LearningHubInprogressScreenState extends State<LearningHubInprogressScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -106,7 +106,7 @@ class _LearningHubAllScreenState extends State<LearningHubAllScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'All Learning',
+                  'In Progress',
                   style: TextStyle(
                     fontSize: 20.0,
                     fontWeight: FontWeight.bold,
@@ -157,14 +157,7 @@ class _LearningHubAllScreenState extends State<LearningHubAllScreen> {
 
                 final user = FirebaseAuth.instance.currentUser;
                 if (user == null) {
-                  final allCoursesFiltered = filtered.map((course) {
-                    return {
-                      ...course,
-                      'progress': 0.0,
-                      'category': 'notstarted',
-                    };
-                  }).toList();
-                  return _buildCourseList(allCoursesFiltered, cardColor, textColor);
+                  return _buildEmptyState('Please sign in to view your progress', textColor);
                 } else {
                   final userProgFutures = filtered.map((course) {
                     return FirebaseFirestore.instance
@@ -181,19 +174,10 @@ class _LearningHubAllScreenState extends State<LearningHubAllScreen> {
                       if (progSnapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
                       }
-                      if (progSnapshot.hasError) {
-                        final allCoursesFiltered = filtered.map((course) {
-                          return {
-                            ...course,
-                            'progress': 0.0,
-                            'category': 'notstarted',
-                          };
-                        }).toList();
-                        return _buildCourseList(allCoursesFiltered, cardColor, textColor);
-                      }
 
                       final progDocs = progSnapshot.data ?? [];
-                      List<Map<String, dynamic>> combined = [];
+                      List<Map<String, dynamic>> inProgressCourses = [];
+                      
                       for (int i = 0; i < filtered.length; i++) {
                         final course = filtered[i];
                         final raw = course['raw'];
@@ -215,13 +199,25 @@ class _LearningHubAllScreenState extends State<LearningHubAllScreen> {
                           }
                         }
 
-                        combined.add({
-                          ...course,
-                          'progress': displayProgress,
-                        });
+                        // Only include courses that are in progress (progress > 0 but not complete)
+                        if (displayProgress > 0.0 && displayProgress < 1.0) {
+                          inProgressCourses.add({
+                            ...course,
+                            'progress': displayProgress,
+                          });
+                        }
                       }
 
-                      return _buildCourseList(combined, cardColor, textColor);
+                      // Apply search filter to in-progress courses
+                      if (query.isNotEmpty) {
+                        inProgressCourses = inProgressCourses.where((course) {
+                          final title = course['title'].toLowerCase();
+                          final description = course['description'].toLowerCase();
+                          return title.contains(query) || description.contains(query);
+                        }).toList();
+                      }
+
+                      return _buildCourseList(inProgressCourses, cardColor, textColor);
                     },
                   );
                 }
@@ -235,15 +231,7 @@ class _LearningHubAllScreenState extends State<LearningHubAllScreen> {
 
   Widget _buildCourseList(List<Map<String, dynamic>> courses, Color cardColor, Color textColor) {
     if (courses.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 40.0),
-          child: Text(
-            'No courses found',
-            style: TextStyle(fontSize: 18.0, color: Colors.grey),
-          ),
-        ),
-      );
+      return _buildEmptyState('No in-progress courses found', textColor);
     }
 
     return ListView.builder(
@@ -253,6 +241,19 @@ class _LearningHubAllScreenState extends State<LearningHubAllScreen> {
         final course = courses[index];
         return _learningItemCardFromMap(course, cardColor, textColor);
       },
+    );
+  }
+
+  Widget _buildEmptyState(String message, Color textColor) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40.0),
+        child: Text(
+          message,
+          style: TextStyle(fontSize: 18.0, color: Colors.grey),
+          textAlign: TextAlign.center,
+        ),
+      ),
     );
   }
 

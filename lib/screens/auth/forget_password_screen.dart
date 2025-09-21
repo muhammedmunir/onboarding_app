@@ -75,75 +75,104 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final theme = Theme.of(context);
+    final bool isDarkMode = theme.brightness == Brightness.dark;
+
+    // Colors that adapt to theme
+    final primaryColor = isDarkMode 
+        ? const Color.fromRGBO(180, 100, 100, 1) // Darker pink for dark mode
+        : const Color.fromRGBO(224, 124, 124, 1);
+        
+    final cardColor = theme.cardColor;
+    final textColor = theme.textTheme.bodyLarge?.color;
+    final hintColor = theme.hintColor;
+    final scaffoldBackground = theme.scaffoldBackgroundColor;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          // Background hexagon
-          Container(
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage("assets/images/background_Splash.jpg"),
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-
-          // Semi circle atas
-          Align(
-            alignment: Alignment.topCenter,
-            child: Container(
-              width: size.width,
-              height: 200,
-              decoration: const BoxDecoration(
-                color: Color.fromRGBO(224, 124, 124, 1),
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(300),
+      resizeToAvoidBottomInset: true,
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(
+          children: [
+            // Background hexagon - adjust for dark mode
+            Container(
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: const AssetImage("assets/images/background_Splash.jpg"),
+                  fit: BoxFit.cover,
+                  colorFilter: isDarkMode 
+                      ? ColorFilter.mode(Colors.black.withOpacity(0.7), BlendMode.darken)
+                      : null,
                 ),
               ),
             ),
-          ),
 
-          // Semi circle bawah
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              width: size.width,
-              height: 200,
-              decoration: const BoxDecoration(
-                color: Color.fromRGBO(224, 124, 124, 1),
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(300),
+            // Fixed Semi circle atas
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  color: primaryColor,
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(300),
+                  ),
+                ),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 40.0),
+                    child: Image.asset(
+                      "assets/images/logo_OnboardingX.png",
+                      width: 200,
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
 
-          // Content
-          SafeArea(
-            child: Stack(
-              children: [
-                SingleChildScrollView(
+            // Fixed Semi circle bawah
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  color: primaryColor,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(300),
+                  ),
+                ),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 40.0),
+                    child: Image.asset(
+                      "assets/images/logo_tnb.png",
+                      width: 170,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Content Area
+            SafeArea(
+              child: Align(
+                alignment: Alignment.center,
+                child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: Column(
                     children: [
-                      const SizedBox(height: 20),
-
-                      // Logo OnboardingX (atas)
-                      Center(
-                        child: Image.asset(
-                          "assets/images/logo_OnboardingX.png",
-                          width: 220,
-                        ),
-                      ),
-
-                      const SizedBox(height: 100),
-
+                      // Spacer to push content below top semicircle
+                      SizedBox(height: size.height * 0.22),
+                      
                       // Forgot Password Card
                       Container(
                         padding: const EdgeInsets.all(24.0),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: cardColor,
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
@@ -157,22 +186,24 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           key: _formKey,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text(
+                              Text(
                                 "Reset Password",
                                 style: TextStyle(
                                   fontSize: 28,
                                   fontWeight: FontWeight.bold,
+                                  color: textColor,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 10),
                               
-                              const Text(
+                              Text(
                                 "Enter your email address and we'll send you instructions to reset your password.",
                                 style: TextStyle(
                                   fontSize: 16,
-                                  color: Colors.grey,
+                                  color: hintColor,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
@@ -181,6 +212,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               // Email
                               TextFormField(
                                 controller: _emailController,
+                                style: TextStyle(color: textColor),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
                                     return 'Please enter your email';
@@ -190,10 +222,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                   }
                                   return null;
                                 },
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   labelText: "Email",
-                                  border: UnderlineInputBorder(),
-                                  prefixIcon: Icon(Icons.email),
+                                  labelStyle: TextStyle(color: hintColor),
+                                  border: const UnderlineInputBorder(),
+                                  prefixIcon: Icon(Icons.email, color: hintColor),
                                 ),
                                 keyboardType: TextInputType.emailAddress,
                               ),
@@ -205,7 +238,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                   : ElevatedButton(
                                       onPressed: _resetPassword,
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color.fromRGBO(224, 124, 124, 1),
+                                        backgroundColor: primaryColor,
                                         padding: const EdgeInsets.symmetric(vertical: 16),
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(30),
@@ -222,11 +255,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               // Back to Login
                               TextButton(
                                 onPressed: () => Navigator.of(context).pop(),
-                                child: const Text(
+                                child: Text(
                                   "Back to Login",
                                   style: TextStyle(
                                     fontSize: 16,
-                                    color: Color.fromRGBO(224, 124, 124, 1),
+                                    color: primaryColor,
                                   ),
                                 ),
                               ),
@@ -234,15 +267,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           ),
                         ),
                       ),
-
-                      const SizedBox(height: 120),
+                      
+                      // Bottom spacer to ensure content doesn't overlap with bottom semicircle
+                      SizedBox(height: size.height * 0.25),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

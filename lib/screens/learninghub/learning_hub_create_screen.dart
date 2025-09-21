@@ -149,16 +149,24 @@ class _LearningHubCreateScreenState extends State<LearningHubCreateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final Color scaffoldBackground = Theme.of(context).scaffoldBackgroundColor;
+    final Color textColor = Theme.of(context).colorScheme.onBackground;
+    final Color cardColor = Theme.of(context).cardColor;
+    final Color hintColor = isDarkMode ? Colors.grey[400]! : Colors.grey[600]!;
+    final Color fieldFillColor = isDarkMode ? Colors.grey[800]! : Colors.grey[100]!;
+
     return Scaffold(
+      backgroundColor: scaffoldBackground,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Create New Learning',
-          style: TextStyle(color: Colors.black),
+          style: TextStyle(color: textColor),
         ),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: const Color.fromARGB(0, 255, 255, 255),
-        foregroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
+        foregroundColor: textColor,
         automaticallyImplyLeading: false,
         leading: Center(
           child: InkWell(
@@ -208,14 +216,18 @@ class _LearningHubCreateScreenState extends State<LearningHubCreateScreen> {
                     // Cover Image URL
                     TextFormField(
                       controller: _coverImageUrlController,
+                      style: TextStyle(color: textColor),
                       decoration: InputDecoration(
                         labelText: 'Cover Image URL',
+                        labelStyle: TextStyle(color: hintColor),
                         hintText: 'https://example.com/image.jpg',
+                        hintStyle: TextStyle(color: hintColor),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12.0),
+                          borderSide: BorderSide(color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!),
                         ),
                         filled: true,
-                        fillColor: Colors.grey[100],
+                        fillColor: fieldFillColor,
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -229,13 +241,16 @@ class _LearningHubCreateScreenState extends State<LearningHubCreateScreen> {
                     // Title Field
                     TextFormField(
                       controller: _titleController,
+                      style: TextStyle(color: textColor),
                       decoration: InputDecoration(
                         labelText: 'Course Title',
+                        labelStyle: TextStyle(color: hintColor),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12.0),
+                          borderSide: BorderSide(color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!),
                         ),
                         filled: true,
-                        fillColor: Colors.grey[100],
+                        fillColor: fieldFillColor,
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -250,14 +265,17 @@ class _LearningHubCreateScreenState extends State<LearningHubCreateScreen> {
                     // Description Field
                     TextFormField(
                       controller: _descriptionController,
+                      style: TextStyle(color: textColor),
                       maxLines: 3,
                       decoration: InputDecoration(
                         labelText: 'Course Description',
+                        labelStyle: TextStyle(color: hintColor),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12.0),
+                          borderSide: BorderSide(color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!),
                         ),
                         filled: true,
-                        fillColor: Colors.grey[100],
+                        fillColor: fieldFillColor,
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -273,16 +291,17 @@ class _LearningHubCreateScreenState extends State<LearningHubCreateScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Lessons',
                           style: TextStyle(
                             fontSize: 20.0,
                             fontWeight: FontWeight.bold,
+                            color: textColor,
                           ),
                         ),
                         IconButton(
                           onPressed: _addNewLesson,
-                          icon: const Icon(Icons.add),
+                          icon: Icon(Icons.add, color: textColor),
                           tooltip: 'Add Lesson',
                         ),
                       ],
@@ -291,8 +310,11 @@ class _LearningHubCreateScreenState extends State<LearningHubCreateScreen> {
                     const SizedBox(height: 10.0),
 
                     if (_lessons.isEmpty)
-                      const Center(
-                        child: Text('No lessons added yet. Click + to add a lesson.'),
+                      Center(
+                        child: Text(
+                          'No lessons added yet. Click + to add a lesson.',
+                          style: TextStyle(color: hintColor),
+                        ),
                       )
                     else
                       ..._lessons.asMap().entries.map((entry) {
@@ -301,6 +323,7 @@ class _LearningHubCreateScreenState extends State<LearningHubCreateScreen> {
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 16.0),
+                          color: cardColor,
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
                             child: Column(
@@ -311,9 +334,10 @@ class _LearningHubCreateScreenState extends State<LearningHubCreateScreen> {
                                   children: [
                                     Text(
                                       'Lesson ${index + 1}',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 18.0,
                                         fontWeight: FontWeight.bold,
+                                        color: textColor,
                                       ),
                                     ),
                                     IconButton(
@@ -326,11 +350,16 @@ class _LearningHubCreateScreenState extends State<LearningHubCreateScreen> {
                                 const SizedBox(height: 10.0),
                                 TextFormField(
                                   initialValue: lesson.title,
+                                  style: TextStyle(color: textColor),
                                   decoration: InputDecoration(
                                     labelText: 'Lesson Title',
+                                    labelStyle: TextStyle(color: hintColor),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8.0),
+                                      borderSide: BorderSide(color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!),
                                     ),
+                                    filled: true,
+                                    fillColor: fieldFillColor,
                                   ),
                                   onChanged: (value) {
                                     setState(() {
@@ -341,12 +370,17 @@ class _LearningHubCreateScreenState extends State<LearningHubCreateScreen> {
                                 const SizedBox(height: 10.0),
                                 TextFormField(
                                   initialValue: lesson.description,
+                                  style: TextStyle(color: textColor),
                                   maxLines: 2,
                                   decoration: InputDecoration(
                                     labelText: 'Lesson Description',
+                                    labelStyle: TextStyle(color: hintColor),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8.0),
+                                      borderSide: BorderSide(color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!),
                                     ),
+                                    filled: true,
+                                    fillColor: fieldFillColor,
                                   ),
                                   onChanged: (value) {
                                     setState(() {
@@ -357,16 +391,22 @@ class _LearningHubCreateScreenState extends State<LearningHubCreateScreen> {
                                 const SizedBox(height: 10.0),
                                 DropdownButtonFormField<String>(
                                   value: lesson.contentType,
+                                  dropdownColor: isDarkMode ? Colors.grey[800] : Colors.white,
+                                  style: TextStyle(color: textColor),
                                   decoration: InputDecoration(
                                     labelText: 'Content Type',
+                                    labelStyle: TextStyle(color: hintColor),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8.0),
+                                      borderSide: BorderSide(color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!),
                                     ),
+                                    filled: true,
+                                    fillColor: fieldFillColor,
                                   ),
                                   items: _contentTypes.map((String type) {
                                     return DropdownMenuItem<String>(
                                       value: type,
-                                      child: Text(type),
+                                      child: Text(type, style: TextStyle(color: textColor)),
                                     );
                                   }).toList(),
                                   onChanged: (String? newValue) {
@@ -378,12 +418,18 @@ class _LearningHubCreateScreenState extends State<LearningHubCreateScreen> {
                                 const SizedBox(height: 10.0),
                                 TextFormField(
                                   initialValue: lesson.contentUrl,
+                                  style: TextStyle(color: textColor),
                                   decoration: InputDecoration(
                                     labelText: 'Content URL',
+                                    labelStyle: TextStyle(color: hintColor),
                                     hintText: 'https://example.com/content',
+                                    hintStyle: TextStyle(color: hintColor),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8.0),
+                                      borderSide: BorderSide(color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!),
                                     ),
+                                    filled: true,
+                                    fillColor: fieldFillColor,
                                   ),
                                   onChanged: (value) {
                                     setState(() {

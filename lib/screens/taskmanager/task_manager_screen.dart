@@ -1,21 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:open_filex/open_filex.dart'; // Import the package
+import 'dart:io' as io;
 
-class DocumentManagerScreen extends StatelessWidget {
-  const DocumentManagerScreen({super.key});
+class TaskManagerScreen extends StatelessWidget {
+  const TaskManagerScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final Color scaffoldBackground = Theme.of(context).scaffoldBackgroundColor;
+    final Color textColor = Theme.of(context).colorScheme.onBackground;
+    final Color hintColor = isDarkMode ? Colors.grey[400]! : Colors.grey[600]!;
+
     return Scaffold(
-      backgroundColor: Colors.grey[100], // Light grey background for the whole screen
+      backgroundColor: scaffoldBackground,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Task Manager',
-          style: TextStyle(color: Colors.black),
+          style: TextStyle(color: textColor),
         ),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: const Color.fromARGB(0, 255, 255, 255),
-        foregroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
+        foregroundColor: textColor,
         automaticallyImplyLeading: false,
         leading: Center(
           child: InkWell(
@@ -43,90 +51,57 @@ class DocumentManagerScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Required Documents Section
             Text(
               'Required Documents',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: textColor,
                   ),
             ),
             const SizedBox(height: 16),
-            const DocumentCard(
-              icon: Icons.check_circle,
-              iconColor: Colors.green,
+            DocumentCard(
               title: 'Lampiran A',
-              subtitle: 'Uploaded',
-              subtitleColor: Colors.green,
+              subtitle: 'Upload the required files',
+              subtitleColor: hintColor,
             ),
             const SizedBox(height: 12),
             DocumentCard(
-              icon: Icons.arrow_circle_up,
-              iconColor: Colors.red,
               title: 'Sijil Tanggung Diri',
-              subtitle: 'Upload in Progress',
-              subtitleColor: Colors.grey[600],
+              subtitle: 'Upload the required files',
+              subtitleColor: hintColor,
             ),
             const SizedBox(height: 12),
             DocumentCard(
-              icon: Icons.add_circle,
-              iconColor: Colors.grey,
               title: 'Penyata Bank',
               subtitle: 'Upload the required files',
-              subtitleColor: Colors.grey[600],
+              subtitleColor: hintColor,
             ),
-
             const SizedBox(height: 32),
-
             // Private Details and Certs Section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Private Details and Certs',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    // Handle View All for Private Details
-                  },
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(0, 0),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            Text(
+              'Private Details and Certs',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
                   ),
-                  child: Text(
-                    'View',
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                ),
-              ],
             ),
             const SizedBox(height: 16),
-            const DocumentCard(
-              icon: Icons.person,
-              iconColor: Colors.black54,
+            DocumentCard(
               title: 'Identity Card (IC)',
               subtitle: 'Upload Required',
-              subtitleColor: Colors.red,
+              subtitleColor: hintColor,
             ),
             const SizedBox(height: 12),
             DocumentCard(
-              icon: Icons.drive_eta, // Using a car icon for driving license
-              iconColor: Colors.black54,
               title: 'Driving License',
               subtitle: 'Optional',
-              subtitleColor: Colors.grey[600],
+              subtitleColor: hintColor,
             ),
             const SizedBox(height: 12),
             DocumentCard(
-              icon: Icons.badge, // Using a badge icon for certificates
-              iconColor: Colors.black54,
               title: 'Certificates',
               subtitle: 'Optional',
-              subtitleColor: Colors.grey[600],
+              subtitleColor: hintColor,
             ),
           ],
         ),
@@ -135,32 +110,140 @@ class DocumentManagerScreen extends StatelessWidget {
   }
 }
 
-class DocumentCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
+class DocumentCard extends StatefulWidget {
   final String title;
   final String subtitle;
   final Color? subtitleColor;
-  final bool showViewButton;
+  final String? initialFile;
 
   const DocumentCard({
     super.key,
-    required this.icon,
-    required this.iconColor,
     required this.title,
     required this.subtitle,
     this.subtitleColor,
-    this.showViewButton = true, // Most cards have a view button
+    this.initialFile,
   });
 
   @override
+  State<DocumentCard> createState() => _DocumentCardState();
+}
+
+class _DocumentCardState extends State<DocumentCard> {
+  String? _selectedFileName;
+  String? _selectedFilePath; // New state variable to store the file path
+  bool _isUploading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize file name and path if an initial file is provided
+    if (widget.initialFile != null) {
+      // Note: This assumes the initialFile path is valid and accessible.
+      // In a real app, you would fetch this path from a database or a file system.
+      _selectedFileName = widget.initialFile;
+      _selectedFilePath = widget.initialFile;
+    }
+  }
+
+  Future<void> _pickFile() async {
+    setState(() {
+      _isUploading = true;
+    });
+
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles();
+      if (result != null) {
+        PlatformFile file = result.files.first;
+        setState(() {
+          _selectedFileName = file.name;
+          _selectedFilePath = file.path; // Store the absolute path
+        });
+        // Simulate upload delay
+        await Future.delayed(const Duration(seconds: 2));
+        _showSnackbar('File "${file.name}" selected successfully!');
+      } else {
+        _showSnackbar('File selection canceled.');
+      }
+    } catch (e) {
+      _showSnackbar('Error picking file: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openFile() async {
+    // Now we check for the file path, which is the correct way
+    if (_selectedFilePath != null) {
+      final result = await OpenFilex.open(_selectedFilePath!);
+      if (result.type != ResultType.done) {
+        _showSnackbar('Error opening file: ${result.message}');
+      } else {
+        _showSnackbar('File "$_selectedFileName" opened successfully.');
+      }
+    } else {
+      _showSnackbar('No file selected to open.');
+    }
+  }
+
+  void _removeFile() {
+    setState(() {
+      _selectedFileName = null;
+      _selectedFilePath = null; // Also clear the path
+      _showSnackbar('File removed successfully!');
+    });
+  }
+
+  void _showSnackbar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final Color cardColor = Theme.of(context).cardColor;
+    final Color textColor = Theme.of(context).colorScheme.onBackground;
+    final Color hintColor = isDarkMode ? Colors.grey[400]! : Colors.grey[600]!;
+    final Color borderColor = isDarkMode ? Colors.grey[700]! : Colors.grey[300]!;
+
+    final bool hasFile = _selectedFilePath != null; // Use the path to check for a file
+
+    IconData cardIcon;
+    Color cardIconColor;
+    String currentSubtitle;
+    Color currentSubtitleColor;
+
+    if (_isUploading) {
+      cardIcon = Icons.upload_file;
+      cardIconColor = Colors.blue;
+      currentSubtitle = 'Uploading...';
+      currentSubtitleColor = Colors.blue[600]!;
+    } else if (hasFile) {
+      cardIcon = Icons.check_circle;
+      cardIconColor = Colors.green;
+      currentSubtitle = _selectedFileName!;
+      currentSubtitleColor = Colors.green;
+    } else {
+      cardIcon = Icons.add_circle;
+      cardIconColor = hintColor;
+      currentSubtitle = widget.subtitle;
+      currentSubtitleColor = widget.subtitleColor ?? hintColor;
+    }
+
     return Card(
-      margin: EdgeInsets.zero, // Remove default card margin
+      margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      elevation: 1, // Subtle shadow
+      elevation: isDarkMode ? 0 : 1,
+      color: cardColor,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
         child: Row(
@@ -170,9 +253,22 @@ class DocumentCard extends StatelessWidget {
               height: 40,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: iconColor.withOpacity(0.1), // Lighter background for the icon circle
+                color: cardIconColor.withOpacity(0.1),
               ),
-              child: Icon(icon, color: iconColor, size: 24),
+              child: _isUploading
+                  ? SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(cardIconColor),
+                        strokeWidth: 3,
+                      ),
+                    )
+                  : Icon(
+                      cardIcon,
+                      color: cardIconColor,
+                      size: 24,
+                    ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -180,42 +276,99 @@ class DocumentCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    title,
-                    style: const TextStyle(
+                    widget.title,
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                      color: textColor,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    subtitle,
+                    currentSubtitle,
                     style: TextStyle(
                       fontSize: 13,
-                      color: subtitleColor ?? Colors.grey[600],
+                      color: currentSubtitleColor,
+                      fontStyle: hasFile ? FontStyle.italic : null,
                     ),
                   ),
                 ],
               ),
             ),
-            if (showViewButton) // Conditionally show the View button
+            // Actions (Upload/View/Edit/Remove)
+            if (_isUploading)
+              Text('Uploading...', style: TextStyle(color: Colors.blue[600]))
+            else if (hasFile)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 30,
+                    child: OutlinedButton(
+                      onPressed: _openFile,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: hintColor,
+                        side: BorderSide(color: borderColor),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: Text('View', style: TextStyle(fontSize: 13, color: hintColor)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  PopupMenuButton<String>(
+                    onSelected: (String result) {
+                      if (result == 'edit') {
+                        _pickFile();
+                      } else if (result == 'remove') {
+                        _removeFile();
+                      }
+                    },
+                    itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                      PopupMenuItem<String>(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, size: 20, color: textColor),
+                            const SizedBox(width: 8),
+                            Text('Edit', style: TextStyle(color: textColor)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'remove',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, size: 20, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Text('Remove', style: TextStyle(color: textColor)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    icon: Icon(Icons.more_vert, color: hintColor),
+                    padding: EdgeInsets.zero,
+                  )
+                ],
+              )
+            else
               SizedBox(
-                height: 30, // Control button height
+                height: 30,
                 child: OutlinedButton(
-                  onPressed: () {
-                    // Handle view button press for this document
-                    print('View ${title}');
-                  },
+                  onPressed: _pickFile,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.grey[600],
-                    side: BorderSide(color: Colors.grey[300]!),
+                    foregroundColor: hintColor,
+                    side: BorderSide(color: borderColor),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    visualDensity: VisualDensity.compact, // Make button smaller
+                    visualDensity: VisualDensity.compact,
                   ),
-                  child: const Text('View', style: TextStyle(fontSize: 13)),
+                  child: Text('Upload', style: TextStyle(fontSize: 13, color: hintColor)),
                 ),
               ),
           ],

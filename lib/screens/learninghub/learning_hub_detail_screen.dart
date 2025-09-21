@@ -128,6 +128,13 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final Color scaffoldBackground = Theme.of(context).scaffoldBackgroundColor;
+    final Color cardColor = Theme.of(context).cardColor;
+    final Color textColor = Theme.of(context).colorScheme.onBackground;
+    final Color dividerColor = isDarkMode ? Colors.grey[700]! : Colors.grey[300]!;
+    final Color hintColor = isDarkMode ? Colors.grey[400]! : Colors.grey[600]!;
+
     final coverImage = (widget.rawData['coverImageUrl'] as String?) ??
         'https://cdn-icons-png.flaticon.com/512/888/888883.png';
     final createdAt = _formatCreatedAt(widget.rawData['createdAt']);
@@ -157,16 +164,16 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
         : const Stream.empty();
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: scaffoldBackground,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Learning Overview',
-          style: TextStyle(color: Colors.black),
+          style: TextStyle(color: textColor),
         ),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
+        foregroundColor: textColor,
         automaticallyImplyLeading: false,
         leading: Center(
           child: InkWell(
@@ -253,10 +260,10 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
                       // Title & meta
                       Text(
                         widget.courseTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 24.0,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: textColor,
                         ),
                       ),
                       const SizedBox(height: 8.0),
@@ -264,7 +271,7 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
                         widget.courseDescription,
                         style: TextStyle(
                           fontSize: 16.0,
-                          color: Colors.grey[600],
+                          color: hintColor,
                         ),
                       ),
                       const SizedBox(height: 8.0),
@@ -289,18 +296,12 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
                       const SizedBox(height: 8.0),
                       Row(
                         children: [
-                          const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                          Icon(Icons.calendar_today, size: 14, color: hintColor),
                           const SizedBox(width: 6),
                           Text(
                             'Created: $createdAt',
-                            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                            style: TextStyle(fontSize: 13, color: hintColor),
                           ),
-                          // const SizedBox(width: 12),
-                          // if (widget.rawData['createdBy'] != null)
-                          //   Text(
-                          //     ' • By ${widget.rawData['createdBy']}',
-                          //     style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                          //   ),
                         ],
                       ),
 
@@ -310,17 +311,17 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'Lessons',
                             style: TextStyle(
                               fontSize: 20.0,
                               fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                              color: textColor,
                             ),
                           ),
                           Text(
                             '${completedCount}/${totalLessons} completed',
-                            style: TextStyle(color: Colors.grey[600]),
+                            style: TextStyle(color: hintColor),
                           ),
                         ],
                       ),
@@ -332,7 +333,7 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 20.0),
                           child: Text(
                             'No lessons found for this course.',
-                            style: TextStyle(color: Colors.grey[600]),
+                            style: TextStyle(color: hintColor),
                           ),
                         )
                       else
@@ -350,11 +351,11 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
                               margin: const EdgeInsets.only(bottom: 12.0),
                               padding: const EdgeInsets.all(12.0),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: cardColor,
                                 borderRadius: BorderRadius.circular(12.0),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.grey.withOpacity(0.12),
+                                    color: Colors.grey.withOpacity(isDarkMode ? 0.1 : 0.12),
                                     blurRadius: 6,
                                     offset: const Offset(0, 2),
                                   ),
@@ -368,9 +369,10 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
                                       Expanded(
                                         child: Text(
                                           lessonTitle,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 16.0,
                                             fontWeight: FontWeight.w600,
+                                            color: textColor,
                                           ),
                                         ),
                                       ),
@@ -393,7 +395,7 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
                                     const SizedBox(height: 8),
                                     Text(
                                       lessonDesc,
-                                      style: TextStyle(color: Colors.grey[600]),
+                                      style: TextStyle(color: hintColor),
                                     ),
                                   ],
                                   const SizedBox(height: 10),
@@ -404,12 +406,12 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                                           margin: const EdgeInsets.only(right: 8),
                                           decoration: BoxDecoration(
-                                            color: Colors.grey[100],
+                                            color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
                                             borderRadius: BorderRadius.circular(12),
                                           ),
                                           child: Text(
                                             contentType,
-                                            style: TextStyle(color: Colors.grey[700]),
+                                            style: TextStyle(color: isDarkMode ? Colors.grey[300] : Colors.grey[700]),
                                           ),
                                         ),
                                       if (contentUrl.isNotEmpty)
@@ -426,7 +428,7 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
                                       if (contentUrl.isEmpty)
                                         Text(
                                           'No content URL',
-                                          style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                                          style: TextStyle(color: hintColor, fontSize: 13),
                                         ),
                                       const Spacer(),
                                       if (user != null)
@@ -434,7 +436,7 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
                                           onPressed: () => _toggleCompleted(idx, completed, totalLessons),
                                           icon: Icon(
                                             completed ? Icons.check_circle : Icons.radio_button_unchecked,
-                                            color: completed ? Colors.green : Colors.grey,
+                                            color: completed ? Colors.green : hintColor,
                                           ),
                                         ),
                                     ],
@@ -456,14 +458,14 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardColor,
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(20.0),
                     topRight: Radius.circular(20.0),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withOpacity(0.2),
+                      color: Colors.grey.withOpacity(isDarkMode ? 0.3 : 0.2),
                       spreadRadius: 2,
                       blurRadius: 8,
                       offset: const Offset(0, -3),
@@ -477,12 +479,12 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Your Progress',
                           style: TextStyle(
                             fontSize: 16.0,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                            color: textColor,
                           ),
                         ),
                         Text(
@@ -503,7 +505,7 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
                             borderRadius: BorderRadius.circular(10),
                             child: LinearProgressIndicator(
                               value: user != null ? userProgress.clamp(0.0, 1.0) : widget.progress.clamp(0.0, 1.0),
-                              backgroundColor: Colors.grey[300],
+                              backgroundColor: isDarkMode ? Colors.grey[700] : Colors.grey[300],
                               valueColor: AlwaysStoppedAnimation<Color>(
                                 userProgress >= 1.0 ? Colors.green : Colors.blue,
                               ),
@@ -521,7 +523,7 @@ class _LearningHubDetailScreenState extends State<LearningHubDetailScreen> {
                                 ? Colors.green
                                 : userProgress > 0.0
                                     ? Colors.blue
-                                    : Colors.grey,
+                                    : hintColor,
                           ),
                         ),
                       ],

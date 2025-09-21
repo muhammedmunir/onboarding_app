@@ -56,6 +56,8 @@ dependencies:
   path: ^1.9.0
   dotted_border: ^2.1.0
   org_chart: ^4.1.0+1
+  open_filex: ^4.7.0
+  dio: ^5.9.0
 
 dev_dependencies:
   flutter_launcher_icons: ^0.14.4

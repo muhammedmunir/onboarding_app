@@ -4,8 +4,8 @@ import 'package:onboarding_app/screens/auth/forget_password_screen.dart';
 import 'package:onboarding_app/screens/auth/register_screen.dart';
 import 'package:onboarding_app/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:provider/provider.dart';
 import 'package:onboarding_app/providers/local_auth_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -468,280 +468,302 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final theme = Theme.of(context);
+    final bool isDarkMode = theme.brightness == Brightness.dark;
+
+    // Colors that adapt to theme
+    final primaryColor = isDarkMode 
+        ? const Color.fromRGBO(180, 100, 100, 1) // Darker pink for dark mode
+        : const Color.fromRGBO(224, 124, 124, 1);
+        
+    final cardColor = theme.cardColor;
+    final textColor = theme.textTheme.bodyLarge?.color;
+    final hintColor = theme.hintColor;
+    final scaffoldBackground = theme.scaffoldBackgroundColor;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          // Background hexagon
-          Container(
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage("assets/images/background_Splash.jpg"),
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-
-          // Fixed Semi circle atas
-          Align(
-            alignment: Alignment.topCenter,
-            child: Container(
-              width: size.width,
-              height: 200,
-              decoration: const BoxDecoration(
-                color: Color.fromRGBO(224, 124, 124, 1),
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(300),
+      resizeToAvoidBottomInset: true,
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(
+          children: [
+            // Background hexagon - adjust for dark mode
+            Container(
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: const AssetImage("assets/images/background_Splash.jpg"),
+                  fit: BoxFit.cover,
+                  colorFilter: isDarkMode 
+                      ? ColorFilter.mode(Colors.black.withOpacity(0.7), BlendMode.darken)
+                      : null,
                 ),
               ),
             ),
-          ),
 
-          // Fixed Semi circle bawah
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              width: size.width,
-              height: 200,
-              decoration: const BoxDecoration(
-                color: Color.fromRGBO(224, 124, 124, 1),
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(300),
+            // Fixed Semi circle atas
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  color: primaryColor,
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(300),
+                  ),
                 ),
-              ),
-            ),
-          ),
-
-          // Fixed Logo OnboardingX
-          Positioned(
-            top: 40,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Image.asset(
-                "assets/images/logo_OnboardingX.png",
-                width: 200,
-              ),
-            ),
-          ),
-
-          // Content
-          SafeArea(
-            child: Stack(
-              children: [
-                // Center the content vertically
-                Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Kad Login
-                          Container(
-                            padding: const EdgeInsets.all(24.0),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 5),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                const Text(
-                                  "Sign In",
-                                  style: TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 20),
-
-                                // Email
-                                TextFormField(
-                                  controller: _emailController,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please enter your email';
-                                    }
-                                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                                      return 'Please enter a valid email';
-                                    }
-                                    return null;
-                                  },
-                                  decoration: const InputDecoration(
-                                    labelText: "Email",
-                                    border: UnderlineInputBorder(),
-                                    prefixIcon: Icon(Icons.email),
-                                  ),
-                                  keyboardType: TextInputType.emailAddress,
-                                ),
-                                const SizedBox(height: 20),
-
-                                // Password
-                                TextFormField(
-                                  controller: _passwordController,
-                                  obscureText: _obscurePassword,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please enter your password';
-                                    }
-                                    if (value.length < 6) {
-                                      return 'Password must be at least 6 characters';
-                                    }
-                                    return null;
-                                  },
-                                  decoration: InputDecoration(
-                                    labelText: "Password",
-                                    border: const UnderlineInputBorder(),
-                                    prefixIcon: const Icon(Icons.lock),
-                                    suffixIcon: IconButton(
-                                      icon: Icon(
-                                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                                      ),
-                                      onPressed: () {
-                                        setState(() {
-                                          _obscurePassword = !_obscurePassword;
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-
-                                // Forget Password
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => const ForgotPasswordScreen(),
-                                        ),
-                                      );
-                                    },
-                                    child: const Text(
-                                      "Forget Password?",
-                                      style: TextStyle(
-                                        color: Color.fromRGBO(224, 124, 124, 1),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-
-                                // Button Login + Biometric di sebelah
-                                _isLoading
-                                    ? const Center(child: CircularProgressIndicator())
-                                    : Row(
-                                        children: [
-                                          Expanded(
-                                            flex: 5,
-                                            child: ElevatedButton(
-                                              onPressed: _login,
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: const Color.fromRGBO(224, 124, 124, 1),
-                                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(30),
-                                                ),
-                                              ),
-                                              child: const Text(
-                                                "Login",
-                                                style: TextStyle(fontSize: 18, color: Colors.white),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          // Biometric button - hanya ditunjuk bila sesuai
-                                          _showBiometricButton
-                                              ? Container(
-                                                  width: 56,
-                                                  height: 48,
-                                                  child: ElevatedButton(
-                                                    onPressed: _fingerPrintLogin,
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor: const Color.fromRGBO(224, 124, 124, 1),
-                                                      padding: EdgeInsets.zero,
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(12),
-                                                      ),
-                                                      elevation: 4,
-                                                    ),
-                                                    child: const Icon(
-                                                      Icons.fingerprint,
-                                                      size: 26,
-                                                      color: Colors.white,
-                                                    ),
-                                                  ),
-                                                )
-                                              : const SizedBox(width: 0),
-                                        ],
-                                      ),
-
-                                // Register link
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Text(
-                                      "Don't have an account? ",
-                                      style: TextStyle(
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => const RegisterScreen(),
-                                          ),
-                                        );
-                                      },
-                                      child: const Text(
-                                        "Register Now",
-                                        style: TextStyle(
-                                          color: Color.fromRGBO(224, 124, 124, 1),
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 40.0),
+                    child: Image.asset(
+                      "assets/images/logo_OnboardingX.png",
+                      width: 200,
                     ),
                   ),
                 ),
+              ),
+            ),
 
-                // Logo TNB bawah center
-                Positioned(
-                  bottom: 25,
-                  left: 0,
-                  right: 0,
-                  child: Center(
+            // Fixed Semi circle bawah
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  color: primaryColor,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(300),
+                  ),
+                ),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 40.0),
                     child: Image.asset(
                       "assets/images/logo_tnb.png",
                       width: 170,
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+
+            // Content Area
+            SafeArea(
+              child: Align(
+                alignment: Alignment.center,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Column(
+                    children: [
+                      // Spacer to push content below top semicircle
+                      SizedBox(height: size.height * 0.22),
+                      
+                      // Login Card
+                      Container(
+                        padding: const EdgeInsets.all(24.0),
+                        decoration: BoxDecoration(
+                          color: cardColor,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                "Sign In",
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 20),
+
+                              // Email
+                              TextFormField(
+                                controller: _emailController,
+                                style: TextStyle(color: textColor),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please enter your email';
+                                  }
+                                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                    return 'Please enter a valid email';
+                                  }
+                                  return null;
+                                },
+                                decoration: InputDecoration(
+                                  labelText: "Email",
+                                  labelStyle: TextStyle(color: hintColor),
+                                  border: const UnderlineInputBorder(),
+                                  prefixIcon: Icon(Icons.email, color: hintColor),
+                                ),
+                                keyboardType: TextInputType.emailAddress,
+                              ),
+                              const SizedBox(height: 20),
+
+                              // Password
+                              TextFormField(
+                                controller: _passwordController,
+                                obscureText: _obscurePassword,
+                                style: TextStyle(color: textColor),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please enter your password';
+                                  }
+                                  if (value.length < 6) {
+                                    return 'Password must be at least 6 characters';
+                                  }
+                                  return null;
+                                },
+                                decoration: InputDecoration(
+                                  labelText: "Password",
+                                  labelStyle: TextStyle(color: hintColor),
+                                  border: const UnderlineInputBorder(),
+                                  prefixIcon: Icon(Icons.lock, color: hintColor),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                                      color: hintColor,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _obscurePassword = !_obscurePassword;
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+
+                              // Forget Password
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => const ForgotPasswordScreen(),
+                                      ),
+                                    );
+                                  },
+                                  child: Text(
+                                    "Forget Password?",
+                                    style: TextStyle(
+                                      color: primaryColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+
+                              // Button Login + Biometric di sebelah
+                              _isLoading
+                                  ? const Center(child: CircularProgressIndicator())
+                                  : Row(
+                                      children: [
+                                        Expanded(
+                                          flex: 5,
+                                          child: ElevatedButton(
+                                            onPressed: _login,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: primaryColor,
+                                              padding: const EdgeInsets.symmetric(vertical: 16),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(30),
+                                              ),
+                                            ),
+                                            child: const Text(
+                                              "Login",
+                                              style: TextStyle(fontSize: 18, color: Colors.white),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        // Biometric button - hanya ditunjuk bila sesuai
+                                        _showBiometricButton
+                                            ? Container(
+                                                width: 56,
+                                                height: 48,
+                                                child: ElevatedButton(
+                                                  onPressed: _fingerPrintLogin,
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: primaryColor,
+                                                    padding: EdgeInsets.zero,
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius: BorderRadius.circular(12),
+                                                    ),
+                                                    elevation: 4,
+                                                  ),
+                                                  child: Icon(
+                                                    Icons.fingerprint,
+                                                    size: 26,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              )
+                                            : const SizedBox(width: 0),
+                                      ],
+                                    ),
+
+                              const SizedBox(height: 20),
+                              // Register link
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    "Don't have an account? ",
+                                    style: TextStyle(
+                                      color: hintColor,
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const RegisterScreen(),
+                                        ),
+                                      );
+                                    },
+                                    child: Text(
+                                      "Register Now",
+                                      style: TextStyle(
+                                        color: primaryColor,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      
+                      // Bottom spacer to ensure content doesn't overlap with bottom semicircle
+                      SizedBox(height: size.height * 0.25),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

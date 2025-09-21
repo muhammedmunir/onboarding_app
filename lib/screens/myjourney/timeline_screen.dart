@@ -298,11 +298,17 @@ class _TimelineScreenState extends State<TimelineScreen> {
   }
 
   void _showMonthYearPicker() {
+    final theme = Theme.of(context);
+    final bool isDarkMode = theme.brightness == Brightness.dark;
+    final cardColor = theme.cardColor;
+    final textColor = theme.textTheme.bodyLarge?.color;
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Select Month and Year'),
+          backgroundColor: cardColor,
+          title: Text('Select Month and Year', style: TextStyle(color: textColor)),
           content: SizedBox(
             width: double.maxFinite,
             child: Column(
@@ -313,7 +319,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_ios),
+                      icon: Icon(Icons.arrow_back_ios, color: textColor),
                       onPressed: () {
                         if (!mounted) return;
                         setState(() {
@@ -323,10 +329,10 @@ class _TimelineScreenState extends State<TimelineScreen> {
                     ),
                     Text(
                       _currentDate.year.toString(),
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.arrow_forward_ios),
+                      icon: Icon(Icons.arrow_forward_ios, color: textColor),
                       onPressed: () {
                         if (!mounted) return;
                         setState(() {
@@ -366,14 +372,21 @@ class _TimelineScreenState extends State<TimelineScreen> {
                       child: Container(
                         margin: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: isCurrentMonth ? Colors.blue : Colors.transparent,
+                          color: isCurrentMonth 
+                              ? (isDarkMode ? Colors.blue[700] : Colors.blue) 
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isDarkMode ? Colors.grey[600]! : Colors.grey[300]!,
+                          ),
                         ),
                         child: Center(
                           child: Text(
                             monthName,
                             style: TextStyle(
-                              color: isCurrentMonth ? Colors.white : Colors.black,
+                              color: isCurrentMonth 
+                                  ? Colors.white 
+                                  : textColor,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -391,6 +404,12 @@ class _TimelineScreenState extends State<TimelineScreen> {
   }
 
   void _showAddEventDialog() {
+    final theme = Theme.of(context);
+    final bool isDarkMode = theme.brightness == Brightness.dark;
+    final cardColor = theme.cardColor;
+    final textColor = theme.textTheme.bodyLarge?.color;
+    final hintColor = theme.hintColor;
+    
     // Reset form fields
     _titleController.clear();
     _startTimeController.text = DateFormat('h:mm a').format(DateTime.now());
@@ -407,16 +426,19 @@ class _TimelineScreenState extends State<TimelineScreen> {
       builder: (BuildContext context) {
         return StatefulBuilder(builder: (context, setState) {
           return AlertDialog(
-            title: const Text('Add New Event'),
+            backgroundColor: cardColor,
+            title: Text('Add New Event', style: TextStyle(color: textColor)),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
                     controller: _titleController,
-                    decoration: const InputDecoration(
+                    style: TextStyle(color: textColor),
+                    decoration: InputDecoration(
                       labelText: 'Title *',
-                      border: OutlineInputBorder(),
+                      labelStyle: TextStyle(color: hintColor),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -440,7 +462,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
                           },
                           child: Text(
                             DateFormat('MMM d, yyyy').format(_newEventDate),
-                            style: const TextStyle(fontSize: 16),
+                            style: TextStyle(fontSize: 16, color: textColor),
                           ),
                         ),
                       ),
@@ -454,9 +476,11 @@ class _TimelineScreenState extends State<TimelineScreen> {
                         child: TextField(
                           controller: _startTimeController,
                           readOnly: true,
-                          decoration: const InputDecoration(
+                          style: TextStyle(color: textColor),
+                          decoration: InputDecoration(
                             labelText: 'Start Time *',
-                            border: OutlineInputBorder(),
+                            labelStyle: TextStyle(color: hintColor),
+                            border: const OutlineInputBorder(),
                           ),
                           onTap: () async {
                             final TimeOfDay? pickedTime = await showTimePicker(
@@ -477,9 +501,11 @@ class _TimelineScreenState extends State<TimelineScreen> {
                         child: TextField(
                           controller: _endTimeController,
                           readOnly: true,
-                          decoration: const InputDecoration(
+                          style: TextStyle(color: textColor),
+                          decoration: InputDecoration(
                             labelText: 'End Time *',
-                            border: OutlineInputBorder(),
+                            labelStyle: TextStyle(color: hintColor),
+                            border: const OutlineInputBorder(),
                           ),
                           onTap: () async {
                             final TimeOfDay? pickedTime = await showTimePicker(
@@ -500,34 +526,43 @@ class _TimelineScreenState extends State<TimelineScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: _locationController,
-                    decoration: const InputDecoration(
+                    style: TextStyle(color: textColor),
+                    decoration: InputDecoration(
                       labelText: 'Location (optional)',
-                      border: OutlineInputBorder(),
+                      labelStyle: TextStyle(color: hintColor),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _descriptionController,
+                    style: TextStyle(color: textColor),
                     maxLines: 3,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Description (optional)',
-                      border: OutlineInputBorder(),
+                      labelStyle: TextStyle(color: hintColor),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _linkController,
-                    decoration: const InputDecoration(
+                    style: TextStyle(color: textColor),
+                    decoration: InputDecoration(
                       labelText: 'Link (optional)',
+                      labelStyle: TextStyle(color: hintColor),
                       hintText: 'https://example.com',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                 ],
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () => Navigator.pop(context), 
+                child: Text('Cancel', style: TextStyle(color: textColor))
+              ),
               ElevatedButton(
                 onPressed: () async {
                   if (_titleController.text.isNotEmpty && _currentUser != null) {
@@ -612,6 +647,13 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bool isDarkMode = theme.brightness == Brightness.dark;
+    final cardColor = theme.cardColor;
+    final textColor = theme.textTheme.bodyLarge?.color;
+    final hintColor = theme.hintColor;
+    final scaffoldBackground = theme.scaffoldBackgroundColor;
+
     final formattedDate = DateFormat('MMM d, yyyy').format(_selectedDate!);
 
     // Get events for selected date and sort by time
@@ -624,6 +666,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
     eventsForSelectedDate.sort((a, b) => (a['date'] as DateTime).compareTo(b['date'] as DateTime));
 
     return Scaffold(
+      backgroundColor: scaffoldBackground,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -636,19 +679,19 @@ class _TimelineScreenState extends State<TimelineScreen> {
                   // Avatar
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: Colors.grey[200],
-                    child: const Icon(Icons.person, size: 40, color: Colors.grey),
+                    backgroundColor: isDarkMode ? Colors.grey[700] : Colors.grey[200],
+                    child: Icon(Icons.person, size: 40, color: isDarkMode ? Colors.grey[300] : Colors.grey),
                   ),
                   const SizedBox(width: 12),
                   // Welcome text with actual user data
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Welcome to TNB,', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                      Text('Welcome to TNB,', style: TextStyle(fontSize: 16, color: hintColor)),
                       const SizedBox(height: 4),
                       Text(
                         _userData?['username'] ?? 'User',
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor),
                       ),
                     ],
                   ),
@@ -663,9 +706,21 @@ class _TimelineScreenState extends State<TimelineScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                IconButton(icon: const Icon(Icons.arrow_back_ios), onPressed: _goToPreviousMonth),
-                GestureDetector(onTap: _showMonthYearPicker, child: Text(DateFormat('MMMM yyyy').format(_currentDate), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-                IconButton(icon: const Icon(Icons.arrow_forward_ios), onPressed: _goToNextMonth),
+                IconButton(
+                  icon: Icon(Icons.arrow_back_ios, color: textColor), 
+                  onPressed: _goToPreviousMonth
+                ),
+                GestureDetector(
+                  onTap: _showMonthYearPicker, 
+                  child: Text(
+                    DateFormat('MMMM yyyy').format(_currentDate), 
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)
+                  )
+                ),
+                IconButton(
+                  icon: Icon(Icons.arrow_forward_ios, color: textColor), 
+                  onPressed: _goToNextMonth
+                ),
               ],
             ),
           ),
@@ -697,18 +752,52 @@ class _TimelineScreenState extends State<TimelineScreen> {
                     width: 70,
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.blue : (isToday ? Colors.blue.withOpacity(0.1) : Colors.transparent),
+                      color: isSelected 
+                          ? (isDarkMode ? Colors.blue[700] : Colors.blue) 
+                          : (isToday 
+                              ? (isDarkMode ? Colors.blue.withOpacity(0.2) : Colors.blue.withOpacity(0.1)) 
+                              : Colors.transparent),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: isToday ? Colors.blue : Colors.transparent, width: 1),
+                      border: Border.all(
+                        color: isToday 
+                            ? (isDarkMode ? Colors.blue[400]! : Colors.blue) 
+                            : Colors.transparent, 
+                        width: 1
+                      ),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(_getDayAbbreviation(day), style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : Colors.grey)),
+                        Text(
+                          _getDayAbbreviation(day), 
+                          style: TextStyle(
+                            fontSize: 12, 
+                            color: isSelected 
+                                ? Colors.white 
+                                : (isDarkMode ? Colors.grey[400] : Colors.grey)
+                          )
+                        ),
                         const SizedBox(height: 4),
-                        Text('${day.day}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : Colors.black)),
+                        Text(
+                          '${day.day}', 
+                          style: TextStyle(
+                            fontSize: 18, 
+                            fontWeight: FontWeight.bold, 
+                            color: isSelected 
+                                ? Colors.white 
+                                : (isDarkMode ? Colors.white : Colors.black)
+                          )
+                        ),
                         if (hasEvents)
-                          Container(width: 6, height: 6, margin: const EdgeInsets.only(top: 4), decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+                          Container(
+                            width: 6, 
+                            height: 6, 
+                            margin: const EdgeInsets.only(top: 4), 
+                            decoration: const BoxDecoration(
+                              color: Colors.red, 
+                              shape: BoxShape.circle
+                            )
+                          ),
                       ],
                     ),
                   ),
@@ -720,19 +809,46 @@ class _TimelineScreenState extends State<TimelineScreen> {
           // Selected date
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(formattedDate, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              if (_isToday(_selectedDate!))
-                Text('Today', style: TextStyle(fontSize: 14, color: Colors.blue[700], fontWeight: FontWeight.bold)),
-            ]),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+              children: [
+                Text(
+                  formattedDate, 
+                  style: TextStyle(
+                    fontSize: 16, 
+                    fontWeight: FontWeight.bold, 
+                    color: textColor
+                  )
+                ),
+                if (_isToday(_selectedDate!))
+                  Text(
+                    'Today', 
+                    style: TextStyle(
+                      fontSize: 14, 
+                      color: isDarkMode ? Colors.blue[300] : Colors.blue[700], 
+                      fontWeight: FontWeight.bold
+                    )
+                  ),
+              ]
+            ),
           ),
 
           // Events list (Timeline)
           Expanded(
             child: _events.isEmpty
-                ? const Center(child: Text('No events found'))
+                ? Center(
+                    child: Text(
+                      'No events found', 
+                      style: TextStyle(color: hintColor)
+                    )
+                  )
                 : eventsForSelectedDate.isEmpty
-                    ? Center(child: Text('No events on $formattedDate'))
+                    ? Center(
+                        child: Text(
+                          'No events on $formattedDate', 
+                          style: TextStyle(color: hintColor)
+                        )
+                      )
                     : ListView.builder(
                         itemCount: eventsForSelectedDate.length,
                         itemBuilder: (context, index) {
@@ -763,6 +879,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
                                   _launchUrl(link);
                                 }
                               },
+                              isDarkMode: isDarkMode,
                             ),
                           );
                         },
@@ -772,7 +889,9 @@ class _TimelineScreenState extends State<TimelineScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddEventDialog,
-        backgroundColor: const Color.fromRGBO(224, 124, 124, 1),
+        backgroundColor: isDarkMode 
+            ? const Color.fromRGBO(180, 100, 100, 1) 
+            : const Color.fromRGBO(224, 124, 124, 1),
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -787,6 +906,7 @@ class TimelineEventItem extends StatelessWidget {
   final String description;
   final String link;
   final Function(String) onLinkTap;
+  final bool isDarkMode;
 
   const TimelineEventItem({
     super.key,
@@ -797,42 +917,103 @@ class TimelineEventItem extends StatelessWidget {
     required this.description,
     required this.link,
     required this.onLinkTap,
+    required this.isDarkMode,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cardColor = theme.cardColor;
+    final textColor = theme.textTheme.bodyLarge?.color;
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(8),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.2), spreadRadius: 1, blurRadius: 3, offset: const Offset(0, 1))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(isDarkMode ? 0.1 : 0.2), 
+            spreadRadius: 1, 
+            blurRadius: 3, 
+            offset: const Offset(0, 1)
+          )
+        ],
       ),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start, 
+        children: [
         // Time indicator
         Container(
           width: 80,
           padding: const EdgeInsets.only(right: 12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(startTime, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue)),
-            Text(endTime, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start, 
+            children: [
+            Text(
+              startTime, 
+              style: TextStyle(
+                fontSize: 16, 
+                fontWeight: FontWeight.bold, 
+                color: isDarkMode ? Colors.blue[300] : Colors.blue
+              )
+            ),
+            Text(
+              endTime, 
+              style: TextStyle(
+                fontSize: 14, 
+                color: isDarkMode ? Colors.grey[400] : Colors.grey[600]
+              )
+            ),
           ]),
         ),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start, 
+            children: [
+            Text(
+              title, 
+              style: TextStyle(
+                fontSize: 16, 
+                fontWeight: FontWeight.bold, 
+                color: textColor
+              )
+            ),
             if (location.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(location, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+              Text(
+                location, 
+                style: TextStyle(
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600], 
+                  fontSize: 14
+                )
+              ),
             ],
             if (description.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text(description, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+              Text(
+                description, 
+                style: TextStyle(
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600], 
+                  fontSize: 14
+                )
+              ),
             ],
             if (link.isNotEmpty) ...[
               const SizedBox(height: 8),
-              GestureDetector(onTap: () => onLinkTap(link), child: Text(link, style: const TextStyle(color: Colors.blue, fontSize: 14, decoration: TextDecoration.underline), overflow: TextOverflow.ellipsis)),
+              GestureDetector(
+                onTap: () => onLinkTap(link), 
+                child: Text(
+                  link, 
+                  style: const TextStyle(
+                    color: Colors.blue, 
+                    fontSize: 14, 
+                    decoration: TextDecoration.underline
+                  ), 
+                  overflow: TextOverflow.ellipsis
+                )
+              ),
             ],
           ]),
         ),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:onboarding_app/screens/meettheteam/organization_chart_screen.dart';
-import 'package:onboarding_app/screens/meettheteam/organization_screen.dart';
 import 'package:onboarding_app/screens/meettheteam/user_profile_detail_screen.dart';
 
 class MeetTheTeamScreen extends StatefulWidget {
@@ -118,16 +117,23 @@ class _MeetTheTeamScreenState extends State<MeetTheTeamScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final Color scaffoldBackground = Theme.of(context).scaffoldBackgroundColor;
+    final Color textColor = Theme.of(context).colorScheme.onBackground;
+    final Color cardColor = Theme.of(context).cardColor;
+    final Color searchFillColor = isDarkMode ? Colors.grey[800]! : Colors.grey[100]!;
+
     return Scaffold(
+      backgroundColor: scaffoldBackground,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Meet The Team',
-          style: TextStyle(color: Colors.black),
+          style: TextStyle(color: textColor),
         ),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: const Color.fromARGB(0, 255, 255, 255),
-        foregroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
+        foregroundColor: textColor,
         automaticallyImplyLeading: false,
         leading: Center(
           child: InkWell(
@@ -160,11 +166,12 @@ class _MeetTheTeamScreenState extends State<MeetTheTeamScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Text(
+                Text(
                   'Department Directory',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
+                    color: textColor,
                   ),
                 ),
                 InkWell(
@@ -204,13 +211,17 @@ class _MeetTheTeamScreenState extends State<MeetTheTeamScreen> {
               controller: searchController,
               decoration: InputDecoration(
                 hintText: 'Search Now...',
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600]),
+                prefixIcon: Icon(Icons.search, color: isDarkMode ? Colors.grey[400] : Colors.grey[600]),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8.0),
+                  borderSide: BorderSide(color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!),
                 ),
                 filled: true,
-                fillColor: Colors.grey[100],
+                fillColor: searchFillColor,
+                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
               ),
+              style: TextStyle(color: textColor),
             ),
           ),
 
@@ -221,7 +232,7 @@ class _MeetTheTeamScreenState extends State<MeetTheTeamScreen> {
               itemCount: filteredMembers.length,
               itemBuilder: (context, index) {
                 final member = filteredMembers[index];
-                return TeamMemberCard(member: member);
+                return TeamMemberCard(member: member, isDarkMode: isDarkMode);
               },
             ),
           ),
@@ -240,16 +251,26 @@ class TeamMember {
 
 class TeamMemberCard extends StatelessWidget {
   final TeamMember member;
+  final bool isDarkMode;
 
-  const TeamMemberCard({super.key, required this.member});
+  const TeamMemberCard({super.key, required this.member, required this.isDarkMode});
 
   @override
   Widget build(BuildContext context) {
+    final Color cardColor = Theme.of(context).cardColor;
+    final Color textColor = Theme.of(context).colorScheme.onBackground;
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-      elevation: 1,
+      elevation: isDarkMode ? 0 : 1,
+      color: cardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8.0),
+        side: isDarkMode 
+          ? BorderSide(color: Colors.grey[700]!, width: 1) 
+          : BorderSide.none,
+      ),
       child: InkWell(
-        // InkWell memberi efek sentuh (ripple). Boleh gunakan GestureDetector juga jika tak mahu ripple.
         onTap: () {
           Navigator.push(
             context,
@@ -266,18 +287,19 @@ class TeamMemberCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                member.name ?? '',
-                style: const TextStyle(
+                member.name,
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
+                  color: textColor,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                member.position ?? '',
+                member.position,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey[600],
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                 ),
               ),
             ],

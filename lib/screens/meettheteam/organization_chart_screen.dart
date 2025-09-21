@@ -15,7 +15,6 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
   bool _compact = false;
   bool _showScrollTop = false;
   final Color _accentColor = const Color.fromRGBO(224, 124, 124, 1);
-  final Color _backgroundColor = const Color(0xFFF9FAFB);
 
   @override
   void initState() {
@@ -45,22 +44,32 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
       return ('${m['name']!} ${m['role']!}').toLowerCase().contains(q);
     }).toList();
   }
+  
+  get dividerColor => null;
 
   @override
   Widget build(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final Color scaffoldBackground = Theme.of(context).scaffoldBackgroundColor;
+    final Color cardColor = Theme.of(context).cardColor;
+    final Color textColor = Theme.of(context).colorScheme.onBackground;
+    final Color dividerColor = isDarkMode ? Colors.grey[700]! : Colors.grey[300]!;
+    final Color hintColor = isDarkMode ? Colors.grey[400]! : Colors.grey[600]!;
+    final Color backgroundColor = isDarkMode ? Colors.grey[900]! : const Color(0xFFF9FAFB);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Organization Chart',
           style: TextStyle(
-            color: Colors.black,
+            color: textColor,
             fontWeight: FontWeight.w600,
           ),
         ),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: _backgroundColor,
-        foregroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
+        foregroundColor: textColor,
         automaticallyImplyLeading: false,
         leading: Container(
           margin: const EdgeInsets.all(8),
@@ -80,21 +89,24 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
 
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [_backgroundColor, Colors.white],
-          ),
+          gradient: isDarkMode 
+            ? null 
+            : LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [backgroundColor, Colors.white],
+              ),
+          color: isDarkMode ? scaffoldBackground : null,
         ),
         child: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header with search and controls
-              _buildHeaderSection(),
+              _buildHeaderSection(isDarkMode, textColor, hintColor, cardColor),
 
               // Filter chips
-              _buildFilterChips(),
+              _buildFilterChips(isDarkMode),
 
               const SizedBox(height: 8),
 
@@ -111,12 +123,12 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         // Leadership hierarchy
-                        _buildLeadershipHierarchy(),
+                        _buildLeadershipHierarchy(isDarkMode, textColor, cardColor, dividerColor),
 
                         const SizedBox(height: 24),
 
                         // Team area
-                        _buildTeamSection(),
+                        _buildTeamSection(isDarkMode, textColor, cardColor),
                       ],
                     ),
                   ),
@@ -128,11 +140,11 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
       ),
 
       // Floating buttons
-      floatingActionButton: _buildFloatingButtons(),
+      floatingActionButton: _buildFloatingButtons(isDarkMode),
     );
   }
 
-  Widget _buildHeaderSection() {
+  Widget _buildHeaderSection(bool isDarkMode, Color textColor, Color hintColor, Color cardColor) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 8.0),
       child: Column(
@@ -142,18 +154,18 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Text(
+              Text(
                 'Department Structure',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: textColor,
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardColor,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
@@ -166,7 +178,7 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
                 child: Text(
                   '${_teamMembers.length} members',
                   style: TextStyle(
-                    color: Colors.grey.shade600,
+                    color: hintColor,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -180,7 +192,7 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cardColor,
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
@@ -193,22 +205,23 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Row(
                     children: [
-                      const Icon(Icons.search, color: Colors.black45),
+                      Icon(Icons.search, color: hintColor),
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: _searchCtr,
-                          decoration: const InputDecoration(
+                          style: TextStyle(color: textColor),
+                          decoration: InputDecoration(
                             hintText: 'Search name or position...',
                             border: InputBorder.none,
-                            hintStyle: TextStyle(color: Colors.black45),
+                            hintStyle: TextStyle(color: hintColor),
                           ),
                         ),
                       ),
                       if (_query.isNotEmpty)
                         IconButton(
                           onPressed: () => _searchCtr.clear(),
-                          icon: const Icon(Icons.clear, size: 20, color: Colors.black45),
+                          icon: Icon(Icons.clear, size: 20, color: hintColor),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
                         ),
@@ -219,7 +232,7 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
               const SizedBox(width: 12),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardColor,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
@@ -234,7 +247,7 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
                   onPressed: () => setState(() => _compact = !_compact),
                   icon: Icon(
                     _compact ? Icons.view_agenda : Icons.grid_view,
-                    color: Colors.black54,
+                    color: hintColor,
                   ),
                 ),
               ),
@@ -245,7 +258,7 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
     );
   }
 
-  Widget _buildFilterChips() {
+  Widget _buildFilterChips(bool isDarkMode) {
     final filters = ['All', 'Manager', 'Executive', 'BPM', 'COTS', 'EMS', 'EPS'];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -259,20 +272,20 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
                 label: Text(
                   filter,
                   style: TextStyle(
-                    color: _filter == filter ? Colors.white : Colors.black87,
+                    color: _filter == filter ? Colors.white : (isDarkMode ? Colors.white : Colors.black87),
                     fontSize: 13,
                   ),
                 ),
                 selected: _filter == filter,
                 onSelected: (selected) => setState(() => _filter = selected ? filter : 'All'),
                 selectedColor: _accentColor,
-                backgroundColor: Colors.white,
+                backgroundColor: isDarkMode ? Colors.grey[800] : Colors.white,
                 checkmarkColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
                 side: BorderSide(
-                  color: _filter == filter ? _accentColor : Colors.grey.shade300,
+                  color: _filter == filter ? _accentColor : (isDarkMode ? Colors.grey[600]! : Colors.grey.shade300),
                   width: 1,
                 ),
                 elevation: 2,
@@ -285,7 +298,7 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
     );
   }
 
-  Widget _buildLeadershipHierarchy() {
+  Widget _buildLeadershipHierarchy(bool isDarkMode, Color textColor, Color cardColor, Color dividerColor) {
     final leaders = [
       {
         'name': 'Datuk Ir. Megat Jalaluddin Bin Megat Hassan',
@@ -302,11 +315,11 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
         final leader = leaders[index];
         return Column(
           children: [
-            _buildLeaderCard(leader['name']!, leader['role']!),
+            _buildLeaderCard(leader['name']!, leader['role']!, isDarkMode, textColor, cardColor),
             if (index < leaders.length - 1)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 4.0),
-                child: Icon(Icons.arrow_downward, size: 24, color: Colors.black45),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Icon(Icons.arrow_downward, size: 24, color: dividerColor),
               ),
           ],
         );
@@ -314,19 +327,19 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
     );
   }
 
-  Widget _buildLeaderCard(String name, String role) {
+  Widget _buildLeaderCard(String name, String role, bool isDarkMode, Color textColor, Color cardColor) {
     return GestureDetector(
-      onTap: () => _showMemberDetails(context, name, role),
+      onTap: () => _showMemberDetails(context, name, role, isDarkMode, textColor, cardColor),
       child: Container(
         width: double.infinity,
         margin: const EdgeInsets.symmetric(vertical: 8),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withOpacity(isDarkMode ? 0.1 : 0.06),
               blurRadius: 16,
               offset: const Offset(0, 6),
             ),
@@ -364,9 +377,10 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
                 children: [
                   Text(
                     name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
+                      color: textColor,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -375,45 +389,45 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
                   Text(
                     role,
                     style: TextStyle(
-                      color: Colors.grey.shade600,
+                      color: isDarkMode ? Colors.grey[400] : Colors.grey.shade600,
                       fontSize: 14,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.black45),
+            Icon(Icons.chevron_right, color: dividerColor),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTeamSection() {
+  Widget _buildTeamSection(bool isDarkMode, Color textColor, Color cardColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 8.0),
+        Padding(
+          padding: const EdgeInsets.only(left: 8.0),
           child: Text(
             'Team Members',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: textColor,
             ),
           ),
         ),
         const SizedBox(height: 12),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 350),
-          child: _compact ? _buildCompactList() : _buildGridList(),
+          child: _compact ? _buildCompactList(isDarkMode, textColor, cardColor) : _buildGridList(isDarkMode, textColor, cardColor),
         ),
       ],
     );
   }
 
-  Widget _buildGridList() {
+  Widget _buildGridList(bool isDarkMode, Color textColor, Color cardColor) {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -426,12 +440,12 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
       itemCount: _filteredTeam.length,
       itemBuilder: (context, index) {
         final member = _filteredTeam[index];
-        return _buildTeamMemberCard(member['name']!, member['role']!);
+        return _buildTeamMemberCard(member['name']!, member['role']!, isDarkMode, textColor, cardColor);
       },
     );
   }
 
-  Widget _buildCompactList() {
+  Widget _buildCompactList(bool isDarkMode, Color textColor, Color cardColor) {
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -440,7 +454,7 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
         height: 1,
         indent: 72,
         endIndent: 16,
-        color: Colors.grey.shade200,
+        color: isDarkMode ? Colors.grey[700] : Colors.grey.shade200,
       ),
       itemBuilder: (context, index) {
         final member = _filteredTeam[index];
@@ -464,41 +478,42 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
           ),
           title: Text(
             member['name']!,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w600,
+              color: textColor,
             ),
           ),
           subtitle: Text(
             member['role']!,
             style: TextStyle(
-              color: Colors.grey.shade600,
+              color: isDarkMode ? Colors.grey[400] : Colors.grey.shade600,
               fontSize: 13,
             ),
           ),
-          trailing: const Icon(Icons.more_vert, color: Colors.black45, size: 20),
-          onTap: () => _showMemberDetails(context, member['name']!, member['role']!),
+          trailing: Icon(Icons.more_vert, color: isDarkMode ? Colors.grey[400] : Colors.black45, size: 20),
+          onTap: () => _showMemberDetails(context, member['name']!, member['role']!, isDarkMode, textColor, cardColor),
         );
       },
     );
   }
 
-  Widget _buildTeamMemberCard(String name, String role) {
+  Widget _buildTeamMemberCard(String name, String role, bool isDarkMode, Color textColor, Color cardColor) {
     return GestureDetector(
-      onTap: () => _showMemberDetails(context, name, role),
+      onTap: () => _showMemberDetails(context, name, role, isDarkMode, textColor, cardColor),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withOpacity(isDarkMode ? 0.1 : 0.04),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
           ],
           border: Border.all(
-            color: Colors.grey.shade100,
+            color: isDarkMode ? Colors.grey[700]! : Colors.grey.shade100,
             width: 1,
           ),
         ),
@@ -528,9 +543,10 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
             const SizedBox(height: 12),
             Text(
               name,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
+                color: textColor,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -540,7 +556,7 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
             Text(
               role,
               style: TextStyle(
-                color: Colors.grey.shade600,
+                color: isDarkMode ? Colors.grey[400] : Colors.grey.shade600,
                 fontSize: 12,
               ),
               maxLines: 2,
@@ -553,7 +569,7 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
     );
   }
 
-  Widget _buildFloatingButtons() {
+  Widget _buildFloatingButtons(bool isDarkMode) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -567,7 +583,7 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
                 curve: Curves.easeOut,
               ),
               mini: true,
-              backgroundColor: Colors.white,
+              backgroundColor: isDarkMode ? Colors.grey[800] : Colors.white,
               child: Icon(
                 Icons.arrow_upward,
                 color: _accentColor,
@@ -575,7 +591,7 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
             ),
           ),
         FloatingActionButton(
-          onPressed: () => _showLegend(context),
+          onPressed: () => _showLegend(context, isDarkMode),
           backgroundColor: _accentColor,
           child: const Icon(Icons.info_outline, color: Colors.white),
         ),
@@ -583,32 +599,37 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
     );
   }
 
-  void _showLegend(BuildContext context) {
+  void _showLegend(BuildContext context, bool isDarkMode) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
+        final Color textColor = Theme.of(context).colorScheme.onBackground;
+        final Color hintColor = isDarkMode ? Colors.grey[400]! : Colors.grey[600]!;
+        
         return Padding(
           padding: const EdgeInsets.all(20.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Organization Chart Guide',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
+                  color: textColor,
                 ),
               ),
               const SizedBox(height: 16),
-              _buildLegendItem('Leadership Hierarchy', 'Shows the top management structure'),
-              _buildLegendItem('Team Members', 'All department members organized by roles'),
-              _buildLegendItem('Search & Filter', 'Find specific people or roles quickly'),
-              _buildLegendItem('View Toggle', 'Switch between grid and list views'),
+              _buildLegendItem('Leadership Hierarchy', 'Shows the top management structure', isDarkMode, textColor, hintColor),
+              _buildLegendItem('Team Members', 'All department members organized by roles', isDarkMode, textColor, hintColor),
+              _buildLegendItem('Search & Filter', 'Find specific people or roles quickly', isDarkMode, textColor, hintColor),
+              _buildLegendItem('View Toggle', 'Switch between grid and list views', isDarkMode, textColor, hintColor),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -634,7 +655,7 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
     );
   }
 
-  Widget _buildLegendItem(String title, String description) {
+  Widget _buildLegendItem(String title, String description, bool isDarkMode, Color textColor, Color hintColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
@@ -652,15 +673,16 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w600,
+                    color: textColor,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   description,
                   style: TextStyle(
-                    color: Colors.grey.shade600,
+                    color: hintColor,
                     fontSize: 14,
                   ),
                 ),
@@ -672,14 +694,17 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
     );
   }
 
-  void _showMemberDetails(BuildContext context, String name, String role) {
+  void _showMemberDetails(BuildContext context, String name, String role, bool isDarkMode, Color textColor, Color cardColor) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
+        final Color hintColor = isDarkMode ? Colors.grey[400]! : Colors.grey[600]!;
+        
         return Padding(
           padding: const EdgeInsets.all(20.0),
           child: Column(
@@ -711,9 +736,10 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
               Center(
                 child: Text(
                   name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: textColor,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -723,7 +749,7 @@ class _OrganizationChartScreenState extends State<OrganizationChartScreen> {
                 child: Text(
                   role,
                   style: TextStyle(
-                    color: Colors.grey.shade600,
+                    color: hintColor,
                     fontSize: 14,
                   ),
                   textAlign: TextAlign.center,

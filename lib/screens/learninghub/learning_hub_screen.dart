@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'learning_hub_create_screen.dart';
 import 'learning_hub_detail_screen.dart';
 import 'learning_hub_complete_screen.dart';
-import 'learning_hub_inprogress_screen.dart';
+import 'learning_hub_in_progress_screen.dart';
 import 'learning_hub_all_screen.dart';
 
 class LearningHubScreen extends StatefulWidget {
@@ -38,7 +38,6 @@ class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindi
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // App is resumed, refresh data
       setState(() {
         _shouldRefresh = true;
       });
@@ -59,6 +58,14 @@ class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindi
 
   @override
   Widget build(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final Color appBarIconColor = isDarkMode ? Colors.white : Colors.black;
+    final Color scaffoldBackground = Theme.of(context).scaffoldBackgroundColor;
+    final Color cardColor = Theme.of(context).cardColor;
+    final Color textColor = Theme.of(context).colorScheme.onBackground;
+    final Color hintColor = isDarkMode ? Colors.grey[400]! : Colors.grey[600]!;
+    final Color searchBackground = isDarkMode ? Colors.grey[800]! : Colors.grey[200]!;
+
     return Focus(
       onFocusChange: (hasFocus) {
         if (hasFocus && _shouldRefresh) {
@@ -66,15 +73,16 @@ class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindi
         }
       },
       child: Scaffold(
+        backgroundColor: scaffoldBackground,
         appBar: AppBar(
-          title: const Text(
+          title: Text(
             'Learning Hub',
-            style: TextStyle(color: Colors.black),
+            style: TextStyle(color: textColor),
           ),
           centerTitle: true,
           elevation: 0,
-          backgroundColor: const Color.fromARGB(0, 255, 255, 255),
-          foregroundColor: Colors.black,
+          backgroundColor: Colors.transparent,
+          foregroundColor: appBarIconColor,
           automaticallyImplyLeading: false,
           leading: Center(
             child: InkWell(
@@ -125,18 +133,20 @@ class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindi
               padding: const EdgeInsets.all(16.0),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey[200],
+                  color: searchBackground,
                   borderRadius: BorderRadius.circular(12.0),
                 ),
                 child: TextField(
                   controller: _searchController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Search Now...',
-                    prefixIcon: Icon(Icons.search, color: Colors.grey),
+                    hintStyle: TextStyle(color: hintColor),
+                    prefixIcon: Icon(Icons.search, color: hintColor),
                     border: InputBorder.none,
                     contentPadding:
                         EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
                   ),
+                  style: TextStyle(color: textColor),
                 ),
               ),
             ),
@@ -187,7 +197,7 @@ class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindi
                         'category': 'notstarted',
                       };
                     }).toList();
-                    return _buildListUI(context, allCoursesFiltered, [], [], filtered.isEmpty);
+                    return _buildListUI(context, allCoursesFiltered, [], [], filtered.isEmpty, isDarkMode);
                   } else {
                     final userProgFutures = filtered.map((course) {
                       return FirebaseFirestore.instance
@@ -212,7 +222,7 @@ class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindi
                               'category': 'notstarted',
                             };
                           }).toList();
-                          return _buildListUI(context, allCoursesFiltered, [], [], filtered.isEmpty);
+                          return _buildListUI(context, allCoursesFiltered, [], [], filtered.isEmpty, isDarkMode);
                         }
 
                         final progDocs = progSnapshot.data ?? [];
@@ -252,7 +262,7 @@ class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindi
 
                         final completeCourses = combined.where((c) => c['category'] == 'complete').toList();
                         final inProgressCourses = combined.where((c) => c['category'] == 'inprogress').toList();
-                        return _buildListUI(context, combined, completeCourses, inProgressCourses, combined.isEmpty);
+                        return _buildListUI(context, combined, completeCourses, inProgressCourses, combined.isEmpty, isDarkMode);
                       },
                     );
                   }
@@ -266,7 +276,10 @@ class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindi
   }
 
   Widget _buildListUI(BuildContext context, List<Map<String, dynamic>> allCoursesFiltered,
-      List<Map<String, dynamic>> completeCourses, List<Map<String, dynamic>> inProgressCourses, bool isEmpty) {
+      List<Map<String, dynamic>> completeCourses, List<Map<String, dynamic>> inProgressCourses, bool isEmpty, bool isDarkMode) {
+    final Color textColor = Theme.of(context).colorScheme.onBackground;
+    final Color cardColor = Theme.of(context).cardColor;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
       child: Column(
@@ -282,9 +295,9 @@ class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindi
                   _shouldRefresh = true;
                 });
               });
-            }),
+            }, textColor),
             const SizedBox(height: 12.0),
-            ...completeCourses.take(2).map((course) => _learningItemCardFromMap(course)),
+            ...completeCourses.take(2).map((course) => _learningItemCardFromMap(course, cardColor, textColor)),
             const SizedBox(height: 24.0),
           ],
           if (inProgressCourses.isNotEmpty) ...[
@@ -297,9 +310,9 @@ class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindi
                   _shouldRefresh = true;
                 });
               });
-            }),
+            }, textColor),
             const SizedBox(height: 12.0),
-            ...inProgressCourses.take(2).map((course) => _learningItemCardFromMap(course)),
+            ...inProgressCourses.take(2).map((course) => _learningItemCardFromMap(course, cardColor, textColor)),
             const SizedBox(height: 24.0),
           ],
           if (allCoursesFiltered.isNotEmpty) ...[
@@ -312,13 +325,13 @@ class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindi
                   _shouldRefresh = true;
                 });
               });
-            }),
+            }, textColor),
             const SizedBox(height: 12.0),
-            ...allCoursesFiltered.take(2).map((course) => _learningItemCardFromMap(course)),
+            ...allCoursesFiltered.take(2).map((course) => _learningItemCardFromMap(course, cardColor, textColor)),
           ],
-          if (isEmpty) const Center(
+          if (isEmpty) Center(
             child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 40.0),
+              padding: const EdgeInsets.symmetric(vertical: 40.0),
               child: Text(
                 'No courses found',
                 style: TextStyle(fontSize: 18.0, color: Colors.grey),
@@ -330,13 +343,13 @@ class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindi
     );
   }
 
-  Widget _buildSectionHeader(String title, bool showSeeAll, VoidCallback onSeeAllPressed) {
+  Widget _buildSectionHeader(String title, bool showSeeAll, VoidCallback onSeeAllPressed, Color textColor) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           title,
-          style: const TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold, color: Colors.black87),
+          style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold, color: textColor),
         ),
         if (showSeeAll) TextButton(
           onPressed: onSeeAllPressed,
@@ -349,7 +362,7 @@ class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindi
     );
   }
 
-  Widget _learningItemCardFromMap(Map<String, dynamic> course) {
+  Widget _learningItemCardFromMap(Map<String, dynamic> course, Color cardColor, Color textColor) {
     final title = course['title'];
     final subtitle = course['description'];
     final imageUrl = course['imageUrl'];
@@ -380,7 +393,7 @@ class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindi
         margin: const EdgeInsets.only(bottom: 8.0),
         padding: const EdgeInsets.all(16.0),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(12.0),
           boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.3), spreadRadius: 1, blurRadius: 6, offset: const Offset(0, 3))],
         ),
@@ -410,7 +423,7 @@ class _LearningHubScreenState extends State<LearningHubScreen> with WidgetsBindi
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18.0)),
+                      Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18.0, color: textColor)),
                       const SizedBox(height: 6.0),
                       Text(subtitle, style: TextStyle(color: Colors.grey[600], fontSize: 14.0)),
                     ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:onboarding_app/services/theme_service.dart';
 
 class SettingScreen extends StatefulWidget {
   const SettingScreen({super.key});
@@ -8,41 +9,16 @@ class SettingScreen extends StatefulWidget {
 }
 
 class _SettingScreenState extends State<SettingScreen> {
-  bool _darkMode = false;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Let the app bar styling come from the theme (no hard-coded colors)
       appBar: AppBar(
-        title: const Text(
-          'Settings',
-          style: TextStyle(color: Colors.black),
-        ),
+        title: const Text('Settings'),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: const Color.fromARGB(0, 255, 255, 255),
-        foregroundColor: Colors.black,
+        backgroundColor: Colors.transparent, // keep transparent if you want
         automaticallyImplyLeading: false,
-        // leading: Center(
-        //   child: InkWell(
-        //     borderRadius: BorderRadius.circular(8),
-        //     onTap: () => Navigator.of(context).pop(),
-        //     child: Container(
-        //       width: 40,
-        //       height: 40,
-        //       decoration: BoxDecoration(
-        //         color: const Color.fromRGBO(224, 124, 124, 1),
-        //         borderRadius: BorderRadius.circular(6),
-        //       ),
-        //       alignment: Alignment.center,
-        //       child: const Icon(
-        //         Icons.arrow_back_ios_new,
-        //         color: Colors.white,
-        //         size: 16,
-        //       ),
-        //     ),
-        //   ),
-        // ),
       ),
       body: ListView(
         children: [
@@ -69,26 +45,33 @@ class _SettingScreenState extends State<SettingScreen> {
               // Navigate to language selection screen
             },
           ),
-          SwitchListTile(
-            title: const Text('Dark Mode'),
-            secondary: Icon(
-              _darkMode ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
-            ),
-            value: _darkMode,
-            onChanged: (value) {
-              setState(() {
-                _darkMode = value;
-              });
-              // Implement dark mode toggle logic here
-            },
-          ),
+
+          // Listen to the themeNotifier to update the UI in real time
+          ValueListenableBuilder<ThemeMode>(
+  valueListenable: themeNotifier,
+  builder: (context, ThemeMode mode, _) {
+    final isDark = mode == ThemeMode.dark;
+    return SwitchListTile(
+      title: const Text('Dark Mode'),
+      secondary: Icon(
+        isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+      ),
+      activeColor: const Color.fromRGBO(224, 124, 124, 1), // warna toggle bila ON
+      value: isDark,
+      onChanged: (value) {
+        themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light;
+      },
+    );
+  },
+),
+
           const SizedBox(height: 16),
           _buildSectionHeader('About'),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                const Icon(Icons.info_outline, color: Colors.grey),
+                Icon(Icons.info_outline, color: Theme.of(context).iconTheme.color),
                 const SizedBox(width: 16),
                 const Text('Version'),
                 const Spacer(),
@@ -111,10 +94,11 @@ class _SettingScreenState extends State<SettingScreen> {
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
       child: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.primary,
+          // keep using primary color for section headers — that works in both themes
+          color: Color.fromRGBO(224, 124, 124, 1),
         ),
       ),
     );
@@ -126,8 +110,8 @@ class _SettingScreenState extends State<SettingScreen> {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
+      leading: Icon(icon), // color now follows theme's iconTheme
+      title: Text(title), // color follows theme text
       trailing: const Icon(Icons.chevron_right),
       onTap: onTap,
     );

@@ -49,16 +49,22 @@ class UserProfileDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final Color scaffoldBackground = Theme.of(context).scaffoldBackgroundColor;
+    final Color textColor = Theme.of(context).colorScheme.onBackground;
+    final Color dividerColor = isDarkMode ? Colors.grey[700]! : Colors.grey[300]!;
+
     return Scaffold(
+      backgroundColor: scaffoldBackground,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Meet The Team',
-          style: TextStyle(color: Colors.black),
+          style: TextStyle(color: textColor),
         ),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: const Color.fromARGB(0, 255, 255, 255),
-        foregroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
+        foregroundColor: textColor,
         automaticallyImplyLeading: false,
         leading: Center(
           child: InkWell(
@@ -87,13 +93,15 @@ class UserProfileDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
-            const Text(
+            Text(
               'User Profile Detail',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
+                color: textColor,
               ),
             ),
+            const SizedBox(height: 20),
             const Center(
               child: CircleAvatar(
                 radius: 50,
@@ -111,24 +119,34 @@ class UserProfileDetailScreen extends StatelessWidget {
             _buildProfileSection(
               title: 'Name',
               content: 'Datuk Ir. Megat Jalaluddin Bin Megat Hassan',
+              isDarkMode: isDarkMode,
+              textColor: textColor,
             ),
             
             // Position Section
             _buildProfileSection(
               title: 'Position',
               content: 'President/Ketua Pegawai Eksekutif (CEO)',
+              isDarkMode: isDarkMode,
+              textColor: textColor,
             ),
             
             // Email Section
             _buildEmailSection(
               title: 'Email',
               content: 'Ceo@tnb.com.my',
+              isDarkMode: isDarkMode,
+              textColor: textColor,
+              dividerColor: dividerColor,
             ),
             
             // Phone Section
             _buildPhoneSection(
               title: 'Phone',
               content: '+60 00000000000',
+              isDarkMode: isDarkMode,
+              textColor: textColor,
+              dividerColor: dividerColor,
             ),
           ],
         ),
@@ -139,6 +157,8 @@ class UserProfileDetailScreen extends StatelessWidget {
   Widget _buildProfileSection({
     required String title,
     required String content,
+    required bool isDarkMode,
+    required Color textColor,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,15 +174,15 @@ class UserProfileDetailScreen extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           content,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
-            color: Colors.black87,
+            color: textColor,
           ),
         ),
         const SizedBox(height: 16),
-        const Divider(
+        Divider(
           thickness: 1,
-          color: Colors.grey,
+          color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
         ),
         const SizedBox(height: 24),
       ],
@@ -172,6 +192,9 @@ class UserProfileDetailScreen extends StatelessWidget {
   Widget _buildEmailSection({
     required String title,
     required String content,
+    required bool isDarkMode,
+    required Color textColor,
+    required Color dividerColor,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -189,22 +212,23 @@ class UserProfileDetailScreen extends StatelessWidget {
           onTap: () => _launchEmail(content),
           child: Row(
             children: [
-              const Icon(Icons.email, color: Colors.grey, size: 20),
+              Icon(Icons.email, color: isDarkMode ? Colors.grey[400] : Colors.grey, size: 20),
               const SizedBox(width: 8),
               Text(
                 content,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   color: Colors.blue,
+                  decoration: TextDecoration.underline,
                 ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 16),
-        const Divider(
+        Divider(
           thickness: 1,
-          color: Colors.grey,
+          color: dividerColor,
         ),
         const SizedBox(height: 24),
       ],
@@ -214,6 +238,9 @@ class UserProfileDetailScreen extends StatelessWidget {
   Widget _buildPhoneSection({
     required String title,
     required String content,
+    required bool isDarkMode,
+    required Color textColor,
+    required Color dividerColor,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,14 +256,14 @@ class UserProfileDetailScreen extends StatelessWidget {
         const SizedBox(height: 8),
         Row(
           children: [
-            const Icon(Icons.phone, color: Colors.grey, size: 20),
+            Icon(Icons.phone, color: isDarkMode ? Colors.grey[400] : Colors.grey, size: 20),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 content,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
-                  color: Colors.black87,
+                  color: textColor,
                 ),
               ),
             ),
@@ -277,9 +304,9 @@ class UserProfileDetailScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        const Divider(
+        Divider(
           thickness: 1,
-          color: Colors.grey,
+          color: dividerColor,
         ),
         const SizedBox(height: 24),
       ],
