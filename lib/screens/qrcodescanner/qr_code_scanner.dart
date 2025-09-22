@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -14,9 +14,7 @@ class ScanQrScreen extends StatefulWidget {
 
 class _ScanQrScreenState extends State<ScanQrScreen>
     with SingleTickerProviderStateMixin {
-  final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
-  QRViewController? qrController;
-  Barcode? result;
+  MobileScannerController cameraController = MobileScannerController();
   bool _scanning = true;
   bool _loading = false;
   bool _permissionGranted = false;
@@ -36,7 +34,7 @@ class _ScanQrScreenState extends State<ScanQrScreen>
 
   @override
   void dispose() {
-    qrController?.dispose();
+    cameraController.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -54,28 +52,19 @@ class _ScanQrScreenState extends State<ScanQrScreen>
   Future<void> _fetchCurrentUserData() async {
     final user = _auth.currentUser;
     if (user != null) {
-      final doc =
-          await _firestore.collection('users').doc(user.uid).get();
+      final doc = await _firestore.collection('users').doc(user.uid).get();
       if (doc.exists) {
         setState(() => _currentUserData = doc.data()! as Map<String, dynamic>);
       }
     }
   }
 
-  void _onQRViewCreated(QRViewController controller) {
-    setState(() => qrController = controller);
-    controller.scannedDataStream.listen((scanData) {
-      if (scanData.code != null && _scanning) {
-        setState(() {
-          result = scanData;
-          _scanning = false;
-        });
-        _handleScannedData(scanData.code!);
-      }
-    });
-  }
+  void _handleBarcode(BarcodeCapture barcode) {
+    if (!_scanning) return;
+    
+    final String? scannedUid = barcode.barcodes.first.rawValue;
+    if (scannedUid == null) return;
 
-  Future<void> _handleScannedData(String scannedUid) async {
     if (scannedUid == _auth.currentUser?.uid) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("You can't scan your own QR code")),
@@ -83,7 +72,15 @@ class _ScanQrScreenState extends State<ScanQrScreen>
       return;
     }
 
-    setState(() => _loading = true);
+    setState(() {
+      _scanning = false;
+      _loading = true;
+    });
+
+    _processScannedUid(scannedUid);
+  }
+
+  Future<void> _processScannedUid(String scannedUid) async {
     try {
       final doc = await _firestore.collection('users').doc(scannedUid).get();
       if (doc.exists) {
@@ -108,24 +105,41 @@ class _ScanQrScreenState extends State<ScanQrScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('User Found'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Name: ${userData['fullName'] ?? 'N/A'}'),
-            Text('Username: ${userData['username'] ?? 'N/A'}'),
-            Text('Email: ${userData['email'] ?? 'N/A'}'),
-            Text('Phone: ${userData['phoneNumber'] ?? 'N/A'}'),
-            Text('Work: ${userData['workType'] ?? 'N/A'}'),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (userData['profileImageUrl'] != null)
+                CircleAvatar(
+                  radius: 40,
+                  backgroundImage: NetworkImage(userData['profileImageUrl']),
+                ),
+              const SizedBox(height: 16),
+              Text('Name: ${userData['fullName'] ?? 'N/A'}'),
+              Text('Username: ${userData['username'] ?? 'N/A'}'),
+              Text('Email: ${userData['email'] ?? 'N/A'}'),
+              Text('Phone: ${userData['phoneNumber'] ?? 'N/A'}'),
+              Text('Work: ${userData['workType'] ?? 'N/A'}'),
+              Text('Unit: ${userData['workUnit'] ?? 'N/A'}'),
+              Text('Workplace: ${userData['workplace'] ?? 'N/A'}'),
+            ],
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+              _resetScanner();
+            },
             child: const Text('Close'),
           ),
           TextButton(
-            onPressed: () => _saveContact(userData),
+            onPressed: () {
+              _saveContact(userData);
+              Navigator.pop(context);
+              _resetScanner();
+            },
             child: const Text('Save Contact'),
           ),
         ],
@@ -137,25 +151,32 @@ class _ScanQrScreenState extends State<ScanQrScreen>
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
-    await _firestore
-        .collection('users')
-        .doc(currentUser.uid)
-        .collection('contacts')
-        .doc(userData['uid'])
-        .set(userData);
+    try {
+      await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .collection('contacts')
+          .doc(userData['uid'])
+          .set({
+            ...userData,
+            'savedAt': FieldValue.serverTimestamp(),
+          });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Contact saved successfully')),
-    );
-    Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Contact saved successfully')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save contact: $e')),
+      );
+    }
   }
 
   void _resetScanner() {
     setState(() {
-      result = null;
       _scanning = true;
     });
-    qrController?.resumeCamera();
+    cameraController.start();
   }
 
   Widget _buildScannerTab() {
@@ -164,7 +185,10 @@ class _ScanQrScreenState extends State<ScanQrScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            const Icon(Icons.camera_alt, size: 64),
+            const SizedBox(height: 16),
             const Text('Camera permission required'),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _checkCameraPermission,
               child: const Text('Grant Permission'),
@@ -176,15 +200,22 @@ class _ScanQrScreenState extends State<ScanQrScreen>
 
     return Stack(
       children: [
-        QRView(
-          key: qrKey,
-          onQRViewCreated: _onQRViewCreated,
-          overlay: QrScannerOverlayShape(
-            borderColor: Colors.red,
-            borderRadius: 10,
-            borderLength: 30,
-            borderWidth: 10,
-            cutOutSize: 250,
+        MobileScanner(
+          controller: cameraController,
+          onDetect: _handleBarcode,
+          fit: BoxFit.cover,
+        ),
+        Center(
+          child: Container(
+            width: 250,
+            height: 250,
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: Colors.white,
+                width: 2,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
         if (_loading)
@@ -194,6 +225,19 @@ class _ScanQrScreenState extends State<ScanQrScreen>
               child: CircularProgressIndicator(),
             ),
           ),
+        Positioned(
+          bottom: 20,
+          left: 0,
+          right: 0,
+          child: Text(
+            'Scan a user QR code',
+            textAlign: TextAlign.center,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: Colors.white),
+          ),
+        ),
       ],
     );
   }
@@ -203,34 +247,87 @@ class _ScanQrScreenState extends State<ScanQrScreen>
       return const Center(child: CircularProgressIndicator());
     }
 
-    return Center(
+    final String uid = _auth.currentUser?.uid ?? '';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          QrImageView(
-            data: _auth.currentUser?.uid ?? '',
-            version: QrVersions.auto,
-            size: 200,
-            gapless: false,
-            embeddedImage: NetworkImage(
-                _currentUserData!['profileImageUrl'] ?? ''),
-            embeddedImageStyle: QrEmbeddedImageStyle(size: Size(40, 40)),
+          Card(
+            elevation: 4,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  if (_currentUserData!['profileImageUrl'] != null)
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundImage:
+                          NetworkImage(_currentUserData!['profileImageUrl']),
+                    ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _currentUserData!['fullName'] ?? 'No Name',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  Text(
+                    '@${_currentUserData!['username'] ?? 'nousername'}',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 24),
+                  QrImageView(
+                    data: uid,
+                    version: QrVersions.auto,
+                    size: 200,
+                    backgroundColor: Colors.white,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Scan this QR code to add me as a contact',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'User ID: ${uid.substring(0, 8)}...',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 20),
-          Text(
-            _currentUserData!['fullName'] ?? '',
-            style: Theme.of(context).textTheme.headlineSmall,
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Work Information',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildInfoRow('Type', _currentUserData!['workType']),
+                  _buildInfoRow('Unit', _currentUserData!['workUnit']),
+                  _buildInfoRow('Workplace', _currentUserData!['workplace']),
+                ],
+              ),
+            ),
           ),
-          Text(
-            _currentUserData!['username'] ?? '',
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Scan this QR code to add me as a contact',
-            style: Theme.of(context).textTheme.bodyMedium,
-            textAlign: TextAlign.center,
-          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String? value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(value ?? 'Not specified'),
         ],
       ),
     );

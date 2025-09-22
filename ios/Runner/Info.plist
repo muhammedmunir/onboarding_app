@@ -7,6 +7,8 @@
 		<key>NSCameraUsageDescription</key>
 		<string>This app needs camera access</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
+		<key>io.flutter.embedded_views_preview</key>
+		<true/>
 		<string>This app needs location access</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>This app needs photo library access</string>
