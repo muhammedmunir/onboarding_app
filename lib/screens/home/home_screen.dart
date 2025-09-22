@@ -9,6 +9,7 @@ import 'package:onboarding_app/screens/learninghub/learning_hub_screen.dart';
 import 'package:onboarding_app/screens/meettheteam/meet_the_team_screen.dart';
 import 'package:onboarding_app/screens/myjourney/appbar_my_journey.dart';
 import 'package:onboarding_app/screens/myjourney/timeline_screen.dart';
+import 'package:onboarding_app/screens/qrcodescanner/qr_code_scanner.dart';
 import 'package:onboarding_app/screens/setting/setting_screen.dart';
 import 'package:onboarding_app/screens/taskmanager/task_manager_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -29,7 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // List of screens for each tab
   final List<Widget> _screens = [
     const HomeContent(), // Home tab
-    const AppBarMyJourney(), // Profile tab
+    const ScanQrScreen(), // QR Code Scanner tab
     const SettingScreen(), // Settings tab
   ];
 
@@ -209,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
       height: 60,
       items: const <Widget>[
         Icon(Icons.home, size: 30, color: Colors.white),
-        Icon(Icons.person, size: 30, color: Colors.white),
+        Icon(Icons.qr_code_scanner, size: 30, color: Colors.white),
         Icon(Icons.settings, size: 30, color: Colors.white),
       ],
       index: _selectedIndex,
@@ -283,6 +284,29 @@ class _HomeContentState extends State<HomeContent> {
     setState(() {
       _isHeaderExpanded = !_isHeaderExpanded;
     });
+  }
+
+  // Add this function to handle URL launching
+  Future<void> _launchURL(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        throw 'Could not launch $url';
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -753,47 +777,27 @@ class _HomeContentState extends State<HomeContent> {
             itemBuilder: (context, index) {
               final news = newsItems[index];
               return GestureDetector(
-                onTap: () async {
-                  final url = news['url'];
-                  if (url != null) {
-                    try {
-                      final encodedUrl = Uri.encodeFull(url);
-                      if (await canLaunchUrl(Uri.parse(encodedUrl))) {
-                        await launchUrl(Uri.parse(encodedUrl));
-                      } else {
-                        throw 'Could not launch $encodedUrl';
-                      }
-                    } catch (e) {
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error: ${e.toString()}'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                },
+                onTap: () => _launchURL(news['url']!),
                 child: Container(
                   width: 300,
                   margin: const EdgeInsets.only(right: 16),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(15),
-                    image: DecorationImage(
-                      image: AssetImage(news['image']!),
+                    image: const DecorationImage(
+                      image: AssetImage('assets/images/background_news.jpeg'),
                       fit: BoxFit.cover,
-                      colorFilter: isDarkMode
-                          ? ColorFilter.mode(
-                              Colors.black.withOpacity(0.5), BlendMode.darken)
-                          : null,
+                      colorFilter: ColorFilter.mode(
+                        Colors.black54,
+                        BlendMode.darken,
+                      ),
                     ),
                   ),
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(15),
-                      gradient: LinearGradient(
+                      gradient: const LinearGradient(
                         colors: [
-                          Colors.black.withOpacity(0.7),
+                          Colors.black87,
                           Colors.transparent
                         ],
                         begin: Alignment.bottomCenter,
