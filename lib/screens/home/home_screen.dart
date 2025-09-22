@@ -705,8 +705,8 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   // -----------------------------
-// News section with multiple news items and external links
-// -----------------------------
+  // News section with multiple news items and external links
+  // -----------------------------
   Widget _buildNewsSection(Color? textColor) {
     final theme = Theme.of(context);
     final bool isDarkMode = theme.brightness == Brightness.dark;
@@ -755,15 +755,23 @@ class _HomeContentState extends State<HomeContent> {
               return GestureDetector(
                 onTap: () async {
                   final url = news['url'];
-                  if (url != null && await canLaunchUrl(Uri.parse(url))) {
-                    await launchUrl(Uri.parse(url));
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Could not launch $url'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
+                  if (url != null) {
+                    try {
+                      final encodedUrl = Uri.encodeFull(url);
+                      if (await canLaunchUrl(Uri.parse(encodedUrl))) {
+                        await launchUrl(Uri.parse(encodedUrl));
+                      } else {
+                        throw 'Could not launch $encodedUrl';
+                      }
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error: ${e.toString()}'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
                 },
                 child: Container(
