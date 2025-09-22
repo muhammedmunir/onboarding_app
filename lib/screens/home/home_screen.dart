@@ -11,6 +11,7 @@ import 'package:onboarding_app/screens/myjourney/appbar_my_journey.dart';
 import 'package:onboarding_app/screens/myjourney/timeline_screen.dart';
 import 'package:onboarding_app/screens/setting/setting_screen.dart';
 import 'package:onboarding_app/screens/taskmanager/task_manager_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -65,7 +66,8 @@ class _HomeScreenState extends State<HomeScreen> {
             .doc(user.uid)
             .get();
 
-        if (!mounted) return; // penting: jangan update state kalau sudah dispose
+        if (!mounted)
+          return; // penting: jangan update state kalau sudah dispose
         if (userDoc.exists) {
           setState(() {
             _userData = userDoc.data() as Map<String, dynamic>?;
@@ -173,9 +175,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bool isDarkMode = theme.brightness == Brightness.dark;
-    
+
     // Colors that adapt to theme
-    final primaryColor = isDarkMode 
+    final primaryColor = isDarkMode
         ? const Color.fromRGBO(180, 100, 100, 1) // Darker pink for dark mode
         : const Color.fromRGBO(224, 124, 124, 1);
 
@@ -287,12 +289,12 @@ class _HomeContentState extends State<HomeContent> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bool isDarkMode = theme.brightness == Brightness.dark;
-    
+
     // Colors that adapt to theme
-    primaryColor = isDarkMode 
+    primaryColor = isDarkMode
         ? const Color.fromRGBO(180, 100, 100, 1) // Darker pink for dark mode
         : const Color.fromRGBO(224, 124, 124, 1);
-        
+
     final cardColor = theme.cardColor;
     final textColor = theme.textTheme.bodyLarge?.color;
     final hintColor = theme.hintColor;
@@ -456,7 +458,8 @@ class _HomeContentState extends State<HomeContent> {
   // -----------------------------
   // Quick Actions - design with 3 columns (more compact)
   // -----------------------------
-  Widget _buildQuickActions(Color primaryColor, Color cardColor, Color? textColor) {
+  Widget _buildQuickActions(
+      Color primaryColor, Color cardColor, Color? textColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Column(
@@ -464,7 +467,8 @@ class _HomeContentState extends State<HomeContent> {
         children: [
           Text(
             "Quick Action",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
+            style: TextStyle(
+                fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
           ),
           const SizedBox(height: 12),
           Container(
@@ -491,12 +495,14 @@ class _HomeContentState extends State<HomeContent> {
                       _buildSmallActionCompact(
                           SvgPicture.asset("assets/svgs/Learning Hub.svg"),
                           "Learning\nHub",
-                          primaryColor, textColor),
+                          primaryColor,
+                          textColor),
                       const SizedBox(height: 20),
                       _buildSmallActionCompact(
                           SvgPicture.asset("assets/svgs/Facilities.svg"),
                           "Facilities\n",
-                          primaryColor, textColor),
+                          primaryColor,
+                          textColor),
                       const SizedBox(height: 50),
                     ],
                   ),
@@ -509,14 +515,16 @@ class _HomeContentState extends State<HomeContent> {
                       _buildSmallActionCompact(
                           SvgPicture.asset("assets/svgs/My Document.svg"),
                           "My\nDocument",
-                          primaryColor, textColor),
+                          primaryColor,
+                          textColor),
                       const SizedBox(height: 20),
                       _buildCenterJourneyCompact(primaryColor),
                       const SizedBox(height: 20),
                       _buildSmallActionCompact(
                           SvgPicture.asset("assets/svgs/Task Manager.svg"),
                           "Task\nManager",
-                          primaryColor, textColor),
+                          primaryColor,
+                          textColor),
                     ],
                   ),
                 ),
@@ -529,12 +537,14 @@ class _HomeContentState extends State<HomeContent> {
                       _buildSmallActionCompact(
                           SvgPicture.asset("assets/svgs/Meet the Team.svg"),
                           "Meet the\nTeam",
-                          primaryColor, textColor),
+                          primaryColor,
+                          textColor),
                       const SizedBox(height: 20),
                       _buildSmallActionCompact(
                           SvgPicture.asset("assets/svgs/Buddy Chat.svg"),
                           "Buddy\nChat",
-                          primaryColor, textColor),
+                          primaryColor,
+                          textColor),
                       const SizedBox(height: 50),
                     ],
                   ),
@@ -548,7 +558,8 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   // Compact small action item
-  Widget _buildSmallActionCompact(Widget icon, String label, Color color, Color? textColor) {
+  Widget _buildSmallActionCompact(
+      Widget icon, String label, Color color, Color? textColor) {
     return GestureDetector(
       onTap: () {
         if (label == "Learning\nHub") {
@@ -619,7 +630,7 @@ class _HomeContentState extends State<HomeContent> {
   Widget _buildCenterJourneyCompact(Color color) {
     final theme = Theme.of(context);
     final bool isDarkMode = theme.brightness == Brightness.dark;
-    
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -635,7 +646,9 @@ class _HomeContentState extends State<HomeContent> {
             height: 120,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isDarkMode ? Colors.grey[800] : const Color.fromRGBO(245, 245, 247, 1),
+              color: isDarkMode
+                  ? Colors.grey[800]
+                  : const Color.fromRGBO(245, 245, 247, 1),
               boxShadow: [
                 BoxShadow(
                   color: Colors.grey.withOpacity(0.12),
@@ -643,7 +656,9 @@ class _HomeContentState extends State<HomeContent> {
                   offset: const Offset(0, 4),
                 ),
                 BoxShadow(
-                  color: isDarkMode ? Colors.black.withOpacity(0.18) : Colors.white.withOpacity(0.18),
+                  color: isDarkMode
+                      ? Colors.black.withOpacity(0.18)
+                      : Colors.white.withOpacity(0.18),
                   blurRadius: 16,
                   offset: const Offset(0, 0),
                   spreadRadius: 2,
@@ -690,12 +705,33 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   // -----------------------------
-  // News section
-  // -----------------------------
+// News section with multiple news items and external links
+// -----------------------------
   Widget _buildNewsSection(Color? textColor) {
     final theme = Theme.of(context);
     final bool isDarkMode = theme.brightness == Brightness.dark;
-    
+
+    // Sample news data - replace with your actual news data
+    final List<Map<String, String>> newsItems = [
+      {
+        'title':
+            'New App Onboard X: Cleaner, easier to use, and faster to navigate.',
+        'image': 'assets/images/background_news.jpeg',
+        'url': 'https://asean.bernama.com/news.php?id=2468953',
+      },
+      {
+        'title': 'Latest Developments in Technology Sector',
+        'image': 'assets/images/background_news.jpeg',
+        'url': 'https://theedgemalaysia.com/node/770755',
+      },
+      {
+        'title': 'Market Trends and Financial Updates',
+        'image': 'assets/images/background_news.jpeg',
+        'url': 'https://finance.yahoo.com/quote/5347.KL/news/',
+      },
+      // Add more news items as needed
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -703,7 +739,8 @@ class _HomeContentState extends State<HomeContent> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Text(
             "News",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor),
+            style: TextStyle(
+                fontSize: 20, fontWeight: FontWeight.bold, color: textColor),
           ),
         ),
         const SizedBox(height: 16),
@@ -712,43 +749,60 @@ class _HomeContentState extends State<HomeContent> {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.only(left: 16),
-            itemCount: 3,
+            itemCount: newsItems.length,
             itemBuilder: (context, index) {
-              return Container(
-                width: 300,
-                margin: const EdgeInsets.only(right: 16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(15),
-                  image: DecorationImage(
-                    image: const AssetImage("assets/images/background_news.jpeg"),
-                    fit: BoxFit.cover,
-                    colorFilter: isDarkMode 
-                        ? ColorFilter.mode(Colors.black.withOpacity(0.5), BlendMode.darken)
-                        : null,
-                  ),
-                ),
+              final news = newsItems[index];
+              return GestureDetector(
+                onTap: () async {
+                  final url = news['url'];
+                  if (url != null && await canLaunchUrl(Uri.parse(url))) {
+                    await launchUrl(Uri.parse(url));
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Could not launch $url'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
                 child: Container(
+                  width: 300,
+                  margin: const EdgeInsets.only(right: 16),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(15),
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.black.withOpacity(0.7),
-                        Colors.transparent
-                      ],
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.center,
+                    image: DecorationImage(
+                      image: AssetImage(news['image']!),
+                      fit: BoxFit.cover,
+                      colorFilter: isDarkMode
+                          ? ColorFilter.mode(
+                              Colors.black.withOpacity(0.5), BlendMode.darken)
+                          : null,
                     ),
                   ),
-                  child: const Align(
-                    alignment: Alignment.bottomLeft,
-                    child: Padding(
-                      padding: EdgeInsets.all(12.0),
-                      child: Text(
-                        "New App Onboard X: Cleaner, easier to use, and faster to navigate.",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(15),
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.black.withOpacity(0.7),
+                          Colors.transparent
+                        ],
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.center,
+                      ),
+                    ),
+                    child: Align(
+                      alignment: Alignment.bottomLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Text(
+                          news['title']!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
