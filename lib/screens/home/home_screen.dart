@@ -4,6 +4,7 @@ import 'package:flutter_svg/svg.dart';
 import 'package:onboarding_app/screens/auth/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:onboarding_app/screens/buddychat/help_center_screen.dart';
 import 'package:onboarding_app/screens/document/document_screen.dart';
 import 'package:onboarding_app/screens/learninghub/learning_hub_screen.dart';
 import 'package:onboarding_app/screens/meettheteam/meet_the_team_screen.dart';
@@ -630,7 +631,7 @@ class _HomeContentState extends State<HomeContent> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const TimelineScreen(),
+              builder: (context) => const HelpCenterScreen(),
             ),
           );
         }
