@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:contacts_service/contacts_service.dart';
 
 class ScanQrScreen extends StatefulWidget {
   const ScanQrScreen({super.key});
@@ -83,6 +84,7 @@ class _ScanQrScreenState extends State<ScanQrScreen>
   Future<void> _processScannedUid(String scannedUid) async {
     try {
       final doc = await _firestore.collection('users').doc(scannedUid).get();
+      
       if (doc.exists) {
         final userData = doc.data()! as Map<String, dynamic>;
         _showUserContactDialog(userData);
@@ -136,18 +138,63 @@ class _ScanQrScreenState extends State<ScanQrScreen>
           ),
           TextButton(
             onPressed: () {
-              _saveContact(userData);
+              _saveContactToPhone(userData);
               Navigator.pop(context);
               _resetScanner();
             },
-            child: const Text('Save Contact'),
+            child: const Text('Save to Phone'),
+          ),
+          TextButton(
+            onPressed: () {
+              _saveContactToApp(userData);
+              Navigator.pop(context);
+              _resetScanner();
+            },
+            child: const Text('Save to App'),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _saveContact(Map<String, dynamic> userData) async {
+  Future<void> _saveContactToPhone(Map<String, dynamic> userData) async {
+    // Check contact permission
+    PermissionStatus permissionStatus = await Permission.contacts.status;
+    if (permissionStatus != PermissionStatus.granted) {
+      permissionStatus = await Permission.contacts.request();
+      if (permissionStatus != PermissionStatus.granted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Contact permission is required')),
+        );
+        return;
+      }
+    }
+
+    try {
+      // Create new contact
+      Contact contact = Contact(
+        givenName: userData['fullName'] ?? '',
+        familyName: '',
+        emails: [Item(label: 'work', value: userData['email'] ?? '')],
+        phones: [Item(label: 'mobile', value: userData['phoneNumber'] ?? '')],
+        company: userData['workplace'] ?? '',
+        jobTitle: userData['workType'] ?? '',
+      );
+
+      // Add contact to device
+      await ContactsService.addContact(contact);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Contact saved to phone successfully')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save contact: $e')),
+      );
+    }
+  }
+
+  Future<void> _saveContactToApp(Map<String, dynamic> userData) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
@@ -163,7 +210,7 @@ class _ScanQrScreenState extends State<ScanQrScreen>
           });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Contact saved successfully')),
+        const SnackBar(content: Text('Contact saved to app successfully')),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -341,9 +388,8 @@ class _ScanQrScreenState extends State<ScanQrScreen>
     final textColor = theme.textTheme.bodyLarge?.color;
     final hintColor = theme.hintColor;
     
-    // Colors that adapt to theme
     final primaryColor = isDarkMode 
-        ? const Color.fromRGBO(180, 100, 100, 1) // Darker pink for dark mode
+        ? const Color.fromRGBO(180, 100, 100, 1)
         : const Color.fromRGBO(224, 124, 124, 1);
 
     return Scaffold(
