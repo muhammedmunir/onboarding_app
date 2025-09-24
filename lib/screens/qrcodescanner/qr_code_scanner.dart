@@ -417,17 +417,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          // Optional: quick button to save vCard directly to phone using flutter_contacts
-          if (_qrAsVCard)
-            ElevatedButton.icon(
-              onPressed: () async {
-                // direkt insert to contacts (same as Save to Phone)
-                await _saveContactToPhone(_currentUserData!);
-              },
-              icon: const Icon(Icons.save),
-              label: const Text('Save vCard to Phone'),
-            ),
           const SizedBox(height: 20),
           Card(
             child: Padding(
